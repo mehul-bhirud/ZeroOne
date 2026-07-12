@@ -254,8 +254,9 @@ export function DashboardScreen() {
         description="Monitor custody, reservations, maintenance, returns, and ghost risk."
       >
         {/* Feature nav */}
-        <FeatureNavigation role="admin" />
-
+        <div className="feature-nav">
+          <FeatureNavigation role="employee" />
+        </div>
         {/* ── Quick Actions ─────────────────────────────────────── */}
         <section className="quick-actions-section" aria-label="Quick actions">
           <p className="quick-actions-title">Quick Actions</p>
