@@ -6,7 +6,7 @@ import { Pool, PoolClient } from "pg";
 import { AuditService } from "../../services/audit-service";
 import { createDatabaseClient, type DatabaseClient } from "../../services/db";
 
-const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5432/postgres";
+const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5433/assetflow";
 const migrationFiles = ["001_extensions.sql", "002_schema_v0.sql", "003_canonical_constraints.sql", "004_activity_log_append_only.sql"];
 let databaseName: string;
 let adminPool: Pool;

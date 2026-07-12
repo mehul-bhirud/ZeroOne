@@ -8,7 +8,7 @@ import { createAuthAppFromDatabase } from "../../auth/app";
 import { loadAuthConfig } from "../../auth/config";
 import { hashPassword } from "../../auth/password";
 
-const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5432/postgres";
+const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5433/assetflow";
 const migrationFiles = [
   "001_extensions.sql",
   "002_schema_v0.sql",
