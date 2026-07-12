@@ -44,7 +44,7 @@ const kpiCards: KpiConfig[] = [
 ];
 
 // Tone → CSS class mapping (uses Sarthak's status-chip tokens as surface colours)
-const tonePanel: Record<string, string> = {
+const tonePanel: Record<KpiConfig["tone"], string> = {
   positive: "kpi-card--positive",
   info:     "kpi-card--info",
   warning:  "kpi-card--warning",
