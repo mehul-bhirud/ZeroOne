@@ -40,6 +40,18 @@ export class TransferService implements TransferOperations {
       }
       const previousAllocation = allocRows[0];
 
+      const fromHolder: any = transferRequest.from_holder;
+      if (
+        fromHolder?.holder_type !== previousAllocation.holder_type ||
+        fromHolder?.holder_id !== previousAllocation.holder_id
+      ) {
+        throw new BusinessConflictError(
+          "CUSTODY_CHANGED",
+          "Asset custody changed since this transfer request was created. Refresh and create a new transfer request.",
+          { asset_id: transferRequest.asset_id, current_allocation: previousAllocation, requested_from: fromHolder },
+        );
+      }
+
       // Mark transfer as approved
       const { rows: updatedTrRows } = await client.query(`
         UPDATE transfer_requests 
