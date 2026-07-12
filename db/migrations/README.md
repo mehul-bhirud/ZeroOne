@@ -9,9 +9,11 @@ Apply migrations lexically with `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f <fil
 5. `005_analytics_views.sql` adds `v_ghost_risk`, utilization, maintenance-frequency, department-allocation,
    booking-heatmap, and dashboard-KPI views. `maintenance_today` is the current approved/in-progress maintenance
    queue because the locked `maintenance_requests` table has no request timestamp.
+6. `006_exit_clearance.sql` adds the `active -> inactive` User trigger and its actionable clearance error signature.
 
 On a clean throwaway database, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_003_constraints.sql` after applying migrations 001–003. After seeding, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_004_activity_log.sql`; both verifiers roll back their fixtures on success.
 After applying migration 005 and seeding, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_005_analytics_views.sql`; it validates view cardinality and seeded KPI/ghost/heatmap data, then rolls back.
+After applying migration 006, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_006_exit_clearance.sql`; it validates direct-SQL blocking and successful deactivation after custody and booking blockers are resolved, then rolls back.
 
 Constraint handoff:
 
@@ -19,8 +21,9 @@ Constraint handoff:
 - Booking overlap conflicts use SQLSTATE `23P01` and `bookings_no_active_overlap_excl`.
 - Case-insensitive email conflicts use SQLSTATE `23505` and `users_email_key`.
 - ActivityLog mutation attempts use SQLSTATE `55000` from `reject_activity_log_mutation`; the `assetflow_app` role also lacks update/delete/truncate privileges.
+- Exit Clearance conflicts use SQLSTATE `AF001`, message `EXIT_CLEARANCE_REQUIRED`, and constraint diagnostic `users_exit_clearance_required`; the detail JSON contains the employee ID and blocking allocation/booking IDs.
 
-Exit Clearance remains reserved for Vishvesh's later task block.
+The Admin deactivation route maps that trigger signature to the locked `409 EXIT_CLEARANCE_REQUIRED` response and enriches the detail payload with the employee, blocking rows, and checklist actions.
 
 Analytics handoff:
 

@@ -7,6 +7,7 @@ import { AuditService } from "../services/audit-service";
 import { BookingService } from "../services/booking-service";
 import { MaintenanceService } from "../services/maintenance-service";
 import type { DatabaseClient } from "../services/db";
+import { ExitClearanceService } from "./exit-clearance";
 
 function asyncRoute(handler: RequestHandler): RequestHandler {
   return (request, response, next) => Promise.resolve(handler(request, response, next)).catch(next);
@@ -26,8 +27,17 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
   const audit = new AuditService(db);
   const bookings = new BookingService(db);
   const maintenance = new MaintenanceService(db);
+  const exitClearance = new ExitClearanceService(db);
 
   router.use(authenticate);
+
+  router.patch("/employees/:id/deactivate", requireRoles("admin"), asyncRoute(async (request, response) => {
+    response.json(await exitClearance.deactivate(
+      pathId(request.params.id),
+      currentUser(response).id,
+      request.body?.reason,
+    ));
+  }));
 
   router.get("/bookings", asyncRoute(async (request, response) => {
     response.json(await bookings.list(request.query as Record<string, string | number | boolean | undefined>));
