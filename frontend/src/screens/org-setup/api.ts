@@ -72,8 +72,8 @@ export async function createDepartment(body: {
 export async function updateDepartment(body: {
   id: string;
   name?: string;
-  parent_department_id?: string;
-  head_user_id?: string;
+  parent_department_id?: string | null;
+  head_user_id?: string | null;
   status?: string;
 }): Promise<Department> {
   const data = await apiFetch<{ department: Department }>("/departments", {

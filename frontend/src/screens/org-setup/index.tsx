@@ -272,7 +272,7 @@ function DepartmentFormModal({
         await updateDepartment({
           id: existing.id,
           name: name.trim(),
-          parent_department_id: parentId || undefined,
+          parent_department_id: parentId || null,
           status,
         });
       } else {

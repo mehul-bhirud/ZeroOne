@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import type { AuthConfig } from "./config";
 import { authenticateBearer } from "./middleware";
@@ -35,6 +36,27 @@ function addFilter(where: string[], params: unknown[], expression: string, value
     params.push(value.trim());
     where.push(expression.replace("?", `$${params.length}`));
   }
+}
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function requiredText(value: unknown, field: string): string {
+  if (typeof value !== "string" || !value.trim()) throw new ValidationError(`${field} is required`);
+  return value.trim();
+}
+
+function optionalUuid(value: unknown, field: string): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string" || !uuidPattern.test(value)) throw new ValidationError(`${field} must be a valid UUID`);
+  return value;
+}
+
+function jsonObject(value: unknown, field: string): Record<string, unknown> {
+  if (value === undefined) return {};
+  if (value === null || Array.isArray(value) || typeof value !== "object") {
+    throw new ValidationError(`${field} must be a JSON object`);
+  }
+  return value as Record<string, unknown>;
 }
 
 function csvValue(value: unknown): string {
@@ -198,6 +220,100 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
     response.json({ departments: rows });
   }));
 
+  router.post("/departments", requireRoles("admin"), asyncRoute(async (request, response) => {
+    const name = requiredText(request.body?.name, "name");
+    const status = request.body?.status ?? "active";
+    if (status !== "active" && status !== "inactive") throw new ValidationError("status must be active or inactive");
+    const parentDepartmentId = optionalUuid(request.body?.parent_department_id, "parent_department_id");
+    const headUserId = optionalUuid(request.body?.head_user_id, "head_user_id");
+    const { rows } = await db.query(`
+      INSERT INTO departments (id, name, parent_department_id, head_user_id, status)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, name, parent_department_id, head_user_id, status
+    `, [randomUUID(), name, parentDepartmentId, headUserId, status]);
+    response.status(201).json({ department: rows[0] });
+  }));
+
+  router.patch("/departments", requireRoles("admin"), asyncRoute(async (request, response) => {
+    const id = optionalUuid(request.body?.id, "id");
+    if (!id) throw new ValidationError("id is required");
+    const updates: string[] = [];
+    const params: unknown[] = [];
+    const setValue = (column: string, value: unknown) => {
+      params.push(value);
+      updates.push(`${column} = $${params.length}`);
+    };
+    if (request.body?.name !== undefined) setValue("name", requiredText(request.body.name, "name"));
+    if (request.body?.status !== undefined) {
+      if (request.body.status !== "active" && request.body.status !== "inactive") throw new ValidationError("status must be active or inactive");
+      setValue("status", request.body.status);
+    }
+    if (request.body?.head_user_id !== undefined) setValue("head_user_id", optionalUuid(request.body.head_user_id, "head_user_id"));
+    if (request.body?.parent_department_id !== undefined) {
+      const parentId = optionalUuid(request.body.parent_department_id, "parent_department_id");
+      if (parentId === id) throw new ValidationError("A department cannot be its own parent");
+      if (parentId) {
+        const cycle = await db.query(`
+          WITH RECURSIVE descendants AS (
+            SELECT id FROM departments WHERE parent_department_id = $1
+            UNION ALL
+            SELECT d.id FROM departments d JOIN descendants x ON d.parent_department_id = x.id
+          )
+          SELECT 1 FROM descendants WHERE id = $2
+        `, [id, parentId]);
+        if (cycle.rows.length > 0) throw new ValidationError("parent_department_id would create a hierarchy cycle");
+      }
+      setValue("parent_department_id", parentId);
+    }
+    if (updates.length === 0) throw new ValidationError("At least one department field must be supplied");
+    params.push(id);
+    const { rows } = await db.query(`
+      UPDATE departments SET ${updates.join(", ")} WHERE id = $${params.length}
+      RETURNING id, name, parent_department_id, head_user_id, status
+    `, params);
+    if (rows.length === 0) throw new ValidationError("Department not found");
+    response.json({ department: rows[0] });
+  }));
+
+  router.get("/categories", requireRoles("admin", "asset_manager"), asyncRoute(async (_request, response) => {
+    const { rows } = await db.query("SELECT id, name, custom_fields FROM asset_categories ORDER BY name");
+    response.json({ categories: rows });
+  }));
+
+  router.post("/categories", requireRoles("admin"), asyncRoute(async (request, response) => {
+    const name = requiredText(request.body?.name, "name");
+    const customFields = jsonObject(request.body?.custom_fields, "custom_fields");
+    const { rows } = await db.query(`
+      INSERT INTO asset_categories (id, name, custom_fields)
+      VALUES ($1, $2, $3::jsonb)
+      RETURNING id, name, custom_fields
+    `, [randomUUID(), name, JSON.stringify(customFields)]);
+    response.status(201).json({ category: rows[0] });
+  }));
+
+  router.patch("/categories", requireRoles("admin"), asyncRoute(async (request, response) => {
+    const id = optionalUuid(request.body?.id, "id");
+    if (!id) throw new ValidationError("id is required");
+    const updates: string[] = [];
+    const params: unknown[] = [];
+    if (request.body?.name !== undefined) {
+      params.push(requiredText(request.body.name, "name"));
+      updates.push(`name = $${params.length}`);
+    }
+    if (request.body?.custom_fields !== undefined) {
+      params.push(JSON.stringify(jsonObject(request.body.custom_fields, "custom_fields")));
+      updates.push(`custom_fields = $${params.length}::jsonb`);
+    }
+    if (updates.length === 0) throw new ValidationError("At least one category field must be supplied");
+    params.push(id);
+    const { rows } = await db.query(`
+      UPDATE asset_categories SET ${updates.join(", ")} WHERE id = $${params.length}
+      RETURNING id, name, custom_fields
+    `, params);
+    if (rows.length === 0) throw new ValidationError("Category not found");
+    response.json({ category: rows[0] });
+  }));
+
   router.get("/employees", requireRoles("admin", "asset_manager", "department_head"), asyncRoute(async (request, response) => {
     const user = currentUser(response);
     const params: unknown[] = [];
@@ -221,6 +337,35 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
       ORDER BY u.name
     `, params);
     response.json({ employees: rows });
+  }));
+
+  router.patch("/employees/:id", requireRoles("admin"), asyncRoute(async (request, response) => {
+    const id = optionalUuid(pathId(request.params.id), "id");
+    if (!id) throw new ValidationError("id is required");
+    const updates: string[] = [];
+    const params: unknown[] = [];
+    if (request.body?.role !== undefined) {
+      if (!["admin", "asset_manager", "department_head", "employee"].includes(request.body.role)) throw new ValidationError("role is invalid");
+      params.push(request.body.role);
+      updates.push(`role = $${params.length}`);
+    }
+    if (request.body?.department_id !== undefined) {
+      params.push(optionalUuid(request.body.department_id, "department_id"));
+      updates.push(`department_id = $${params.length}`);
+    }
+    if (request.body?.status !== undefined) {
+      if (request.body.status !== "active") throw new ValidationError("Use the deactivation endpoint to make an employee inactive");
+      params.push(request.body.status);
+      updates.push(`status = $${params.length}`);
+    }
+    if (updates.length === 0) throw new ValidationError("At least one employee field must be supplied");
+    params.push(id);
+    const { rows } = await db.query(`
+      UPDATE users SET ${updates.join(", ")} WHERE id = $${params.length}
+      RETURNING id, name, email, role, department_id, status
+    `, params);
+    if (rows.length === 0) throw new ValidationError("Employee not found");
+    response.json({ employee: rows[0] });
   }));
 
   router.post("/allocations", requireRoles("admin", "asset_manager"), asyncRoute(async (request, response) => {
