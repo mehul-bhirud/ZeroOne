@@ -1,7 +1,7 @@
 import { AssetOperations, Identifier, JsonRecord, Query } from "./contracts";
 import { DatabaseClient } from "./db";
 import { assetStateMachine, AssetState } from "../domain/workflows";
-import { ValidationError } from "../domain/errors";
+import { ValidationError, TransitionError } from "../domain/errors";
 
 export class AssetService implements AssetOperations {
   constructor(private db: DatabaseClient) {}

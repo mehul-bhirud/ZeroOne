@@ -45,6 +45,10 @@ export class AllocationService implements AllocationOperations {
         (error.code === "23505" && error.constraint === "one_active_allocation") ||
         (error.code === "INVALID_TRANSITION" && error.details?.entity === "Asset" && error.details?.from === "allocated" && error.details?.to === "allocated")
       ) {
+      // 23505 is PostgreSQL unique_violation. We rely on the partial unique index.
+      if (error.code === '23505' && error.constraint === 'one_active_allocation') {
+        // Fetch current holder details to enrich the error
+        // Fetch current allocation + holder details to enrich the error
         const { rows: allocRows } = await this.db.query(`
           SELECT a.*, u.name as holder_name
           FROM allocations a
@@ -83,7 +87,7 @@ export class AllocationService implements AllocationOperations {
   }
 
   async returnAsset(id: Identifier, input: JsonRecord): Promise<JsonRecord> {
-    const { return_condition_notes } = input;
+    const { return_condition_notes, action } = input;
     
     return await this.db.transaction(async (client) => {
       // Atomically return the allocation (prevents double-returns under concurrency)
