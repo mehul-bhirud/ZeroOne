@@ -63,22 +63,21 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div style={{ flex: 1, padding: "12px 0" }}>
           {visibleItems.map((item) => (
-            <Link
+            <NavLink
               key={item.to}
               to={item.to}
-              style={{
+              style={({ isActive }) => ({
                 display: "block",
                 padding: "10px 20px",
-                color: window.location.pathname === item.to ? "#5AA7FF" : "#9EABB8",
+                color: isActive ? "#5AA7FF" : "#9EABB8",
                 textDecoration: "none",
                 fontSize: 14,
-                fontWeight: window.location.pathname === item.to ? 700 : 400,
-                background: window.location.pathname === item.to ? "#1E262F" : "transparent",
-              }}
+                fontWeight: isActive ? 700 : 400,
+                background: isActive ? "#1E262F" : "transparent",
+              })}
             >
               {item.label}
-            </Link>
-          ))}
+            </NavLink>
         </div>
 
         <div style={{ padding: "16px 20px", borderTop: "1px solid #33404D" }}>
