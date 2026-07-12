@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { LoginScreen, SignupScreen, ForgotPasswordScreen } from "./auth";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { AllocationScreen } from "./screens/allocation";
