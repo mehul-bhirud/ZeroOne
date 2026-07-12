@@ -1,0 +1,29 @@
+:root { color: #F3F6F8; background: #0B0F14; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 1024px; min-height: 100vh; background: #0B0F14; }
+button, input { font: inherit; }
+.screen-shell { width: min(1180px, calc(100% - 64px)); margin: 0 auto; padding: 64px 0; }
+.screen-shell header { margin-bottom: 28px; }
+.screen-shell h1 { margin: 4px 0 8px; font-size: 36px; }
+.screen-shell p { color: #9EABB8; }
+.eyebrow { color: #5AA7FF !important; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.panel { border: 1px solid #33404D; border-radius: 14px; background: #141A21; padding: 24px; }
+.raised { background: #1E262F; }
+.button { border: 0; border-radius: 9px; background: #5AA7FF; color: #07111B; padding: 10px 16px; font-weight: 700; cursor: pointer; }
+.button:disabled { cursor: not-allowed; opacity: .55; }
+.input { width: 100%; border: 1px solid #33404D; border-radius: 9px; background: #0B0F14; color: #F3F6F8; padding: 10px 12px; }
+.form-field { display: grid; gap: 8px; margin-bottom: 16px; }
+.form-field small { color: #9EABB8; }
+.status-chip { display: inline-flex; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.status-chip--positive { background: #173C2D; color: #7DE2AE; }
+.status-chip--info { background: #19334E; color: #8FC8FF; }
+.status-chip--warning { background: #493714; color: #FFD47A; }
+.status-chip--danger { background: #4B2227; color: #FF9AA5; }
+.status-chip--neutral { background: #29323B; color: #C6D0D8; }
+.empty-state { display: flex; justify-content: space-between; align-items: center; }
+.error-summary { border-left: 4px solid #F87171; background: #351B20; padding: 12px 16px; }
+.skeleton { display: block; height: 14px; margin: 10px 0; border-radius: 7px; background: #1E262F; animation: pulse 1.3s infinite alternate; }
+.toast { position: fixed; right: 24px; bottom: 24px; background: #1E262F; border: 1px solid #33404D; border-radius: 10px; padding: 14px 18px; }
+.auth-card { max-width: 440px; }
+@keyframes pulse { to { opacity: .45; } }
+
