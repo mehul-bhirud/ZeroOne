@@ -2,6 +2,8 @@ import { AllocationOperations, Identifier, JsonRecord } from "./contracts";
 import { DatabaseClient } from "./db";
 import { BusinessConflictError, ValidationError } from "../domain/errors";
 import { assetStateMachine } from "../domain/workflows";
+import { logActivity } from "./activity-log";
+import { NotificationTriggers } from "./notification-service";
 
 export class AllocationService implements AllocationOperations {
   constructor(private db: DatabaseClient) {}
@@ -15,8 +17,8 @@ export class AllocationService implements AllocationOperations {
 
     try {
       return await this.db.transaction(async (client) => {
-        const { rows: assetRows } = await client.query<{ status: string }>(
-          `SELECT status FROM assets WHERE id = $1 FOR UPDATE`,
+        const { rows: assetRows } = await client.query<{ status: string; asset_tag: string }>(
+          `SELECT status, asset_tag FROM assets WHERE id = $1 FOR UPDATE`,
           [asset_id],
         );
         if (assetRows.length === 0) {
@@ -36,7 +38,19 @@ export class AllocationService implements AllocationOperations {
 
         await client.query(`UPDATE assets SET status = 'allocated' WHERE id = $1`, [asset_id]);
 
-        return { allocation: rows[0] };
+        const allocation = rows[0];
+
+        await logActivity(client, (input.actor_id as string) || null, "allocate", "Asset", asset_id as string, {
+          holder_type,
+          holder_id,
+          expected_return_date,
+        });
+
+        if (holder_type === "employee") {
+          await NotificationTriggers.allocation(client, holder_id as string, assetRows[0].asset_tag || (asset_id as string), "created");
+        }
+
+        return { allocation };
       });
     } catch (error: any) {
       // Map the canonical partial-index violation (and an equivalent state transition)
@@ -106,6 +120,15 @@ export class AllocationService implements AllocationOperations {
         WHERE id = $1
         RETURNING *
       `, [allocation.asset_id]);
+
+      await logActivity(client, (input.actor_id as string) || null, "return", "Asset", allocation.asset_id, {
+        allocation_id: allocation.id,
+        return_condition_notes,
+      });
+
+      if (allocation.holder_type === "employee") {
+        await NotificationTriggers.allocation(client, allocation.holder_id, assetRows[0].asset_tag || allocation.asset_id, "returned");
+      }
 
       return {
         allocation: updatedAllocRows[0],

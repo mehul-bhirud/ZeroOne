@@ -32,7 +32,7 @@ describe("MaintenanceService", () => {
         rows: [{ id: "a1", status: "available" }], 
         rowCount: 1 
       }); // SELECT asset status FOR UPDATE
-      vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 }); // UPDATE asset status
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ id: "a1", status: "under_maintenance", asset_tag: "TAG-1" }], rowCount: 1 }); // UPDATE asset status
 
       // Mock ActivityLog insert
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 });
@@ -71,8 +71,7 @@ describe("MaintenanceService", () => {
         rows: [{ id: "a1", status: "under_maintenance" }], 
         rowCount: 1 
       }); 
-      // Update asset
-      vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 });
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ id: "a1", status: "available", asset_tag: "TAG-1" }], rowCount: 1 });
       // Log
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 });
       // Notification

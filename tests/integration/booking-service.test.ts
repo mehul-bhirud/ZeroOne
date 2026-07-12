@@ -59,8 +59,11 @@ describe("BookingService", () => {
 
   describe("cancel (rescheduling part 1)", () => {
     it("transitions upcoming booking to cancelled", async () => {
-      vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ status: "upcoming" }], rowCount: 1 }); // Current status
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ status: "upcoming", asset_id: "a1", booked_by: "u1" }], rowCount: 1 }); // Current status
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ id: "b1", status: "cancelled" }], rowCount: 1 }); // Update result
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ asset_tag: "TAG-1" }], rowCount: 1 }); // Asset tag query
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 }); // Activity Log
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 }); // Notification
 
       const result = await service.cancel("b1", { reason: "Rescheduling" });
       expect((result.booking as any).status).toBe("cancelled");
@@ -74,10 +77,13 @@ describe("BookingService", () => {
       const end = new Date(now.getTime() + 60 * 60000);
 
       vi.mocked(db.query).mockResolvedValueOnce({ 
-        rows: [{ status: "upcoming", start_time: start.toISOString(), end_time: end.toISOString() }], 
+        rows: [{ status: "upcoming", start_time: start.toISOString(), end_time: end.toISOString(), asset_id: "a1", booked_by: "u1" }], 
         rowCount: 1 
       }); 
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ id: "b1", status: "ongoing" }], rowCount: 1 });
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ asset_tag: "TAG-1" }], rowCount: 1 }); // Asset tag query
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 }); // Activity Log
+      vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 }); // Notification
 
       const result = await service.checkin("b1");
       expect((result.booking as any).status).toBe("ongoing");
@@ -89,7 +95,7 @@ describe("BookingService", () => {
       const end = new Date(now.getTime() + 60 * 60000);
 
       vi.mocked(db.query).mockResolvedValueOnce({ 
-        rows: [{ status: "upcoming", start_time: start.toISOString(), end_time: end.toISOString() }], 
+        rows: [{ status: "upcoming", start_time: start.toISOString(), end_time: end.toISOString(), asset_id: "a1", booked_by: "u1" }], 
         rowCount: 1 
       }); 
 
