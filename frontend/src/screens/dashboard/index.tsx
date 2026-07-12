@@ -228,13 +228,13 @@ export function DashboardScreen() {
         .qa-btn--warning  { background: #493714; color: #FFD47A; border: 1px solid #6B521F; }
 
         /* ── Feature nav ───────────────────────────────────────── */
-        nav[aria-label="Feature navigation"] {
+        .feature-nav nav {
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
           margin-bottom: 32px;
         }
-        nav[aria-label="Feature navigation"] a {
+        .feature-nav a {
           display: inline-block;
           padding: 7px 16px;
           border-radius: 8px;
@@ -246,7 +246,7 @@ export function DashboardScreen() {
           border: 1px solid #33404D;
           transition: background .15s, color .15s;
         }
-        nav[aria-label="Feature navigation"] a:hover { background: #29323B; color: #F3F6F8; }
+        .feature-nav a:hover { background: #29323B; color: #F3F6F8; }
       `}</style>
 
       <ScreenShell
