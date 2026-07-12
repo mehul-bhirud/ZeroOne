@@ -36,10 +36,18 @@ export interface Asset {
   condition: string;
   location: string;
   is_bookable: boolean;
-  status: string;
+  status: AssetStatus;
   photo_url?: string;
-  created_at: string;
 }
+
+export type AssetStatus =
+  | "available"
+  | "allocated"
+  | "reserved"
+  | "under_maintenance"
+  | "lost"
+  | "retired"
+  | "disposed";
 
 export async function getAssets(filters?: {
   search?: string;

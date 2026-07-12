@@ -12,6 +12,7 @@ import {
   Modal,
   Toast,
 } from "../../design-system";
+import type { Status } from "../../design-system";
 import { useAuth } from "../../auth/AuthContext";
 import {
   getAssets,
@@ -19,6 +20,7 @@ import {
   getCategories,
   getDepartments,
   type Asset,
+  type AssetStatus,
 } from "./api";
 import type { AssetCategory, Department } from "../org-setup/api";
 
@@ -107,7 +109,9 @@ export function AssetRegistryScreen() {
           <option value="">All statuses</option>
           <option value="available">Available</option>
           <option value="allocated">Allocated</option>
-          <option value="maintenance">Maintenance</option>
+          <option value="reserved">Reserved</option>
+          <option value="under_maintenance">Under Maintenance</option>
+          <option value="lost">Lost</option>
           <option value="retired">Retired</option>
           <option value="disposed">Disposed</option>
         </select>
@@ -173,7 +177,7 @@ export function AssetRegistryScreen() {
                   </td>
                   <td style={{ color: "#9EABB8" }}>{asset.location}</td>
                   <td>
-                    <StatusChip status={asset.status.replace("_", " ") as any} />
+                    <StatusChip status={formatAssetStatus(asset.status)} />
                   </td>
                   <td>
                     <Link to={`/assets/${asset.id}`} className="button button--outline button--sm">
@@ -203,6 +207,20 @@ export function AssetRegistryScreen() {
       {toast && <Toast message={toast} />}
     </ScreenShell>
   );
+}
+
+const assetStatusLabels: Record<AssetStatus, Status> = {
+  available: "Available",
+  allocated: "Allocated",
+  reserved: "Reserved",
+  under_maintenance: "Under Maintenance",
+  lost: "Lost",
+  retired: "Retired",
+  disposed: "Disposed",
+};
+
+function formatAssetStatus(status: AssetStatus): Status {
+  return assetStatusLabels[status];
 }
 
 function RegisterAssetModal({
