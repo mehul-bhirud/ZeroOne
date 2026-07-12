@@ -27,7 +27,6 @@ async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getToken();
-
   const headers = new Headers({
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
