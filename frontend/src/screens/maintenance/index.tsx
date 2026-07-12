@@ -14,14 +14,14 @@ import { getToken } from "../../auth/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Priority = "Low" | "Medium" | "High" | "Critical";
+type Priority = "low" | "medium" | "high" | "critical";
 type MRStatus =
-  | "Pending"
-  | "Approved"
-  | "Rejected"
-  | "Technician Assigned"
-  | "In Progress"
-  | "Resolved";
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "technician_assigned"
+  | "in_progress"
+  | "resolved";
 
 interface MaintenanceRequest {
   id: string;
@@ -38,6 +38,27 @@ interface MaintenanceRequest {
   updated_at?: string;
 }
 
+// Formatter helpers
+function formatStatus(status: MRStatus): string {
+  switch (status) {
+    case "pending": return "Pending";
+    case "approved": return "Approved";
+    case "rejected": return "Rejected";
+    case "technician_assigned": return "Technician Assigned";
+    case "in_progress": return "In Progress";
+    case "resolved": return "Resolved";
+  }
+}
+
+function formatPriority(priority: Priority): string {
+  switch (priority) {
+    case "low": return "Low";
+    case "medium": return "Medium";
+    case "high": return "High";
+    case "critical": return "Critical";
+  }
+}
+
 // ─── Fixture mode ─────────────────────────────────────────────────────────────
 // Activated ONLY when: (1) running in Vite dev server AND (2) VITE_USE_FIXTURES=true.
 // Never used as a silent fallback for real errors.
@@ -49,25 +70,25 @@ const FIXTURE_REQUESTS: MaintenanceRequest[] = [
   {
     id: "MR-001", asset_id: "a1", asset_name: "MacBook Pro 16\u2033", asset_tag: "AF-0042",
     issue_description: "Battery drains completely within 2 hours under normal load.",
-    priority: "High", status: "Pending", raised_by: "Priya Nair", technician: null,
+    priority: "high", status: "pending", raised_by: "Priya Nair", technician: null,
     created_at: new Date(Date.now() - 86_400_000).toISOString(),
   },
   {
     id: "MR-002", asset_id: "a2", asset_name: "Bosch Drill SHR", asset_tag: "AF-0078",
     issue_description: "Chuck slips when tightening; possible internal wear.",
-    priority: "Medium", status: "Approved", raised_by: "Ankit Joshi", technician: null,
+    priority: "medium", status: "approved", raised_by: "Ankit Joshi", technician: null,
     created_at: new Date(Date.now() - 172_800_000).toISOString(),
   },
   {
     id: "MR-003", asset_id: "a3", asset_name: "Dell Monitor 27\u2033", asset_tag: "AF-0091",
     issue_description: "Horizontal dead-pixel band across the centre of the screen.",
-    priority: "Low", status: "In Progress", raised_by: "Karan Singh", technician: "Raj Patel",
+    priority: "low", status: "in_progress", raised_by: "Karan Singh", technician: "Raj Patel",
     created_at: new Date(Date.now() - 259_200_000).toISOString(),
   },
   {
     id: "MR-004", asset_id: "a4", asset_name: "Canon EOS R5", asset_tag: "AF-0115",
     issue_description: "Autofocus fails intermittently in low-light conditions.",
-    priority: "Critical", status: "Resolved", raised_by: "Rahul Mehta", technician: "Divya Kumar",
+    priority: "critical", status: "resolved", raised_by: "Rahul Mehta", technician: "Divya Kumar",
     created_at: new Date(Date.now() - 432_000_000).toISOString(),
   },
 ];
@@ -134,9 +155,9 @@ async function transitionRequest(
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 function priorityClass(p: Priority): string {
-  return p === "Critical" ? "mr-priority--critical"
-    : p === "High"     ? "mr-priority--high"
-    : p === "Medium"   ? "mr-priority--medium"
+  return p === "critical" ? "mr-priority--critical"
+    : p === "high"     ? "mr-priority--high"
+    : p === "medium"   ? "mr-priority--medium"
     :                    "mr-priority--low";
 }
 
@@ -172,9 +193,9 @@ function RequestRow({
         <span className="mr-desc">{req.issue_description}</span>
       </td>
       <td>
-        <span className={`mr-priority ${priorityClass(req.priority)}`}>{req.priority}</span>
+        <span className={`mr-priority ${priorityClass(req.priority)}`}>{formatPriority(req.priority)}</span>
       </td>
-      <td><StatusChip status={req.status} /></td>
+      <td><StatusChip status={formatStatus(req.status)} /></td>
       <td style={{ color: "#9EABB8", fontSize: 13 }}>{req.technician ?? "—"}</td>
       <td style={{ color: "#9EABB8", fontSize: 13 }}>{fmtDate(req.created_at)}</td>
       <td>
@@ -182,7 +203,7 @@ function RequestRow({
           {hasError && (
             <span className="mr-action-error" role="alert">{actionError!.message}</span>
           )}
-          {req.status === "Pending" && (
+          {req.status === "pending" && (
             <>
               <button id={`mr-approve-${req.id}`} className="button button--sm"
                 disabled={isBusy} onClick={() => onApprove(req.id)}>
@@ -194,19 +215,19 @@ function RequestRow({
               </button>
             </>
           )}
-          {req.status === "Approved" && (
+          {req.status === "approved" && (
             <button id={`mr-assign-${req.id}`} className="button button--sm button--outline"
               disabled={isBusy} onClick={() => onAssign(req.id)}>
               {isBusy ? "…" : "Assign Technician"}
             </button>
           )}
-          {req.status === "Technician Assigned" && (
+          {req.status === "technician_assigned" && (
             <button id={`mr-start-${req.id}`} className="button button--sm button--outline"
               disabled={isBusy} onClick={() => onStart(req.id)}>
               {isBusy ? "…" : "Start Work"}
             </button>
           )}
-          {req.status === "In Progress" && (
+          {req.status === "in_progress" && (
             <button id={`mr-resolve-${req.id}`} className="button button--sm"
               disabled={isBusy} onClick={() => onResolve(req.id)}>
               {isBusy ? "…" : "Mark Resolved"}
@@ -220,8 +241,14 @@ function RequestRow({
 
 // ─── MaintenanceScreen ────────────────────────────────────────────────────────
 
-type Tab = "All" | "Pending" | "Approved" | "In Progress" | "Resolved";
-const TABS: Tab[] = ["All", "Pending", "Approved", "In Progress", "Resolved"];
+type Tab = "All" | "pending" | "approved" | "in_progress" | "resolved";
+const TABS: { id: Tab, label: string }[] = [
+  { id: "All", label: "All" },
+  { id: "pending", label: "Pending" },
+  { id: "approved", label: "Approved" },
+  { id: "in_progress", label: "In Progress" },
+  { id: "resolved", label: "Resolved" }
+];
 
 export function MaintenanceScreen() {
   const [requests,   setRequests  ] = useState<MaintenanceRequest[]>([]);
@@ -232,7 +259,7 @@ export function MaintenanceScreen() {
 
   // Report-issue modal
   const [showModal,  setShowModal ] = useState(false);
-  const [form,       setForm      ] = useState({ asset_id: "", issue_description: "", priority: "Medium" as Priority });
+  const [form,       setForm      ] = useState({ asset_id: "", issue_description: "", priority: "medium" as Priority });
   const [formError,  setFormError ] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -285,8 +312,8 @@ export function MaintenanceScreen() {
   const visible = requests.filter((r) => {
     const matchTab =
       tab === "All" ||
-      (tab === "In Progress"
-        ? r.status === "In Progress" || r.status === "Technician Assigned"
+      (tab === "in_progress"
+        ? r.status === "in_progress" || r.status === "technician_assigned"
         : r.status === tab);
     const q = search.toLowerCase();
     const matchSearch = !q ||
@@ -389,7 +416,7 @@ export function MaintenanceScreen() {
       });
       setRequests((prev) => [created, ...prev]);
       setShowModal(false);
-      setForm({ asset_id: "", issue_description: "", priority: "Medium" });
+      setForm({ asset_id: "", issue_description: "", priority: "medium" });
       showToast("Maintenance request submitted.");
     } catch (err: unknown) {
       const e = err as ApiErrorShape;
@@ -455,7 +482,7 @@ export function MaintenanceScreen() {
               />
               <Button
                 id="mr-report-issue"
-                onClick={() => { setShowModal(true); setFormError(null); setForm({ asset_id: "", issue_description: "", priority: "Medium" }); }}
+                onClick={() => { setShowModal(true); setFormError(null); setForm({ asset_id: "", issue_description: "", priority: "medium" }); }}
               >
                 + Report issue
               </Button>
@@ -464,14 +491,14 @@ export function MaintenanceScreen() {
             <div className="tab-bar" role="tablist" aria-label="Filter by status">
               {TABS.map((t) => (
                 <button
-                  key={t}
-                  id={`mr-tab-${t.toLowerCase().replace(/\s/g, "-")}`}
+                  key={t.id}
+                  id={`mr-tab-${t.id}`}
                   role="tab"
-                  aria-selected={tab === t}
-                  className={tab === t ? "active" : ""}
-                  onClick={() => setTab(t)}
+                  aria-selected={tab === t.id}
+                  className={tab === t.id ? "active" : ""}
+                  onClick={() => setTab(t.id)}
                 >
-                  {t}
+                  {t.label}
                 </button>
               ))}
             </div>
@@ -536,10 +563,10 @@ export function MaintenanceScreen() {
               <FormField label="Priority">
                 <select id="mr-form-priority" className="mr-select" value={form.priority}
                   onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as Priority }))}>
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                  <option value="Critical">Critical</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
                 </select>
               </FormField>
               <FormField label="Issue description">

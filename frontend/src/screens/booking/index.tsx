@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button, FormField, Input, ScreenShell, Skeleton, StatusChip, Toast } from "../../design-system";
+import { getToken } from "../../auth/api";
 
 // ── Types matching the API contract ──────────────────────────────────────────
 interface Booking {
@@ -64,6 +65,9 @@ function durationMins(start: string, end: string) {
   return Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
 }
 
+const FIXTURE_MODE =
+  import.meta.env.DEV && import.meta.env.VITE_USE_FIXTURES === "true";
+
 // ── Mock bookable assets (replace with real fetch when backend is up) ─────────
 const MOCK_ASSETS: Asset[] = [
   { id: "a-001", name: "Projector — Epson EB-S41", asset_tag: "AF-0021", status: "Available", is_bookable: true },
@@ -93,9 +97,32 @@ function mockBookings(assetId: string): Booking[] {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export function BookingScreen() {
+  const [assets, setAssets] = useState<Asset[]>([]);
+  
   // Asset selection
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
-  const selectedAsset = MOCK_ASSETS.find((a) => a.id === selectedAssetId) ?? null;
+  const selectedAsset = assets.find((a) => a.id === selectedAssetId) ?? null;
+
+  useEffect(() => {
+    async function loadAssets() {
+      if (FIXTURE_MODE) {
+        setAssets(MOCK_ASSETS);
+        return;
+      }
+      try {
+        const res = await fetch(`${API}/assets`, {
+          headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAssets((data.assets ?? []).filter((a: Asset) => a.is_bookable));
+        }
+      } catch (err) {
+        console.error("Failed to fetch assets", err);
+      }
+    }
+    void loadAssets();
+  }, []);
 
   // Timeline state
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -132,7 +159,7 @@ export function BookingScreen() {
     setGenericError(null);
     try {
       const res = await fetch(`${API}/bookings?asset_id=${assetId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
+        headers: { Authorization: `Bearer ${getToken() ?? ""}` },
       });
       if (!res.ok) throw new Error("Failed to load bookings");
       const data = await res.json();
@@ -169,7 +196,7 @@ export function BookingScreen() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+          Authorization: `Bearer ${getToken() ?? ""}`,
         },
         body: JSON.stringify(body),
       });
@@ -204,7 +231,7 @@ export function BookingScreen() {
     try {
       const res = await fetch(`${API}/bookings/${bookingId}/checkin`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
+        headers: { Authorization: `Bearer ${getToken() ?? ""}` },
       });
       if (!res.ok) {
         const err: { error: ApiError } = await res.json();
@@ -229,7 +256,7 @@ export function BookingScreen() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+          Authorization: `Bearer ${getToken() ?? ""}`,
         },
         body: JSON.stringify({ reason: "Cancelled by user" }),
       });
@@ -257,7 +284,7 @@ export function BookingScreen() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token") ?? ""}`,
+          Authorization: `Bearer ${getToken() ?? ""}`,
         },
         body: JSON.stringify({ reason: "Rescheduling" }),
       });
@@ -530,7 +557,7 @@ export function BookingScreen() {
         <section aria-label="Select a resource" style={{ marginBottom: 28 }}>
           <p className="section-title" style={{ marginBottom: 12 }}>Select a Resource</p>
           <div className="asset-picker">
-            {MOCK_ASSETS.map((asset) => (
+            {assets.map((asset) => (
               <button
                 key={asset.id}
                 id={`asset-tile-${asset.id}`}
