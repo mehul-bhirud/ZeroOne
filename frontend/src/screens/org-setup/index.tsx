@@ -106,7 +106,8 @@ function DepartmentsTab() {
   );
 
   /* Build hierarchy: departments with their children */
-  const rootDepts = filtered.filter((d) => !d.parent_department_id);
+  const filteredIds = new Set(filtered.map((d) => d.id));
+  const rootDepts = filtered.filter((d) => !d.parent_department_id || !filteredIds.has(d.parent_department_id));
   const childrenOf = (parentId: string) => filtered.filter((d) => d.parent_department_id === parentId);
 
   if (loading) return <Skeleton lines={5} />;
