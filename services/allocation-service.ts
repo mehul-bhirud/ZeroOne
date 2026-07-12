@@ -84,22 +84,19 @@ export class AllocationService implements AllocationOperations {
     const { return_condition_notes, action } = input;
     
     return await this.db.transaction(async (client) => {
-      // Find the allocation
-      const { rows: allocRows } = await client.query(`SELECT * FROM allocations WHERE id = $1 AND returned_at IS NULL`, [id]);
-      if (allocRows.length === 0) {
-        throw new BusinessConflictError("INVALID_ALLOCATION_STATE", "Allocation not found or already returned");
-      }
-      const allocation = allocRows[0];
-      
-      // Update the allocation
+      // Atomically return the allocation (prevents double-returns under concurrency)
       const { rows: updatedAllocRows } = await client.query(`
         UPDATE allocations 
         SET returned_at = now(), return_condition_notes = $2
-        WHERE id = $1
+        WHERE id = $1 AND returned_at IS NULL
         RETURNING *
       `, [id, return_condition_notes]);
 
-      // Update the asset status back to available
+      if (updatedAllocRows.length === 0) {
+        throw new BusinessConflictError("INVALID_ALLOCATION_STATE", "Allocation not found or already returned");
+      }
+
+      const allocation = updatedAllocRows[0];
       const { rows: assetRows } = await client.query(`
         UPDATE assets
         SET status = 'available'
