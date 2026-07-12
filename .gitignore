@@ -12,3 +12,8 @@ Thumbs.db
 .vscode/
 .turbo/
 
+# Spec and planning files (tracked in main, excluded from feature branches)
+AGENT.md
+API_CONTRACT.md
+PROJECT_SPEC.md
+*_TASKS.md
