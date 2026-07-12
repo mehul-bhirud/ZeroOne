@@ -10,11 +10,26 @@ export class AssetService implements AssetOperations {
     const { search, category, status, department, location } = query;
     let sql = `SELECT * FROM assets WHERE 1=1`;
     const params: any[] = [];
-    
-    // Simplistic query building for demonstration
+
     if (status) {
       params.push(status);
       sql += ` AND status = $${params.length}`;
+    }
+
+    if (category) {
+      params.push(category);
+      sql += ` AND category_id = $${params.length}`;
+    }
+
+    if (location) {
+      params.push(location);
+      sql += ` AND location = $${params.length}`;
+    }
+
+    if (search) {
+      params.push(`%${search}%`);
+      const i = params.length;
+      sql += ` AND (name ILIKE $${i} OR asset_tag ILIKE $${i} OR serial_number ILIKE $${i})`;
     }
     
     // Execute query
