@@ -41,7 +41,7 @@ describe("MaintenanceService", () => {
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const result = await service.approve("m1", { approved_by: "a1" });
-      expect(result.maintenance_request.status).toBe("approved");
+      expect((result.maintenance_request as any).status).toBe("approved");
 
       // Verify asset status update was called
       expect(db.query).toHaveBeenCalledWith(
@@ -79,7 +79,7 @@ describe("MaintenanceService", () => {
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [], rowCount: 1 });
 
       const result = await service.resolve("m1", { resolved_by: "t1" });
-      expect(result.maintenance_request.status).toBe("resolved");
+      expect((result.maintenance_request as any).status).toBe("resolved");
 
       expect(db.query).toHaveBeenCalledWith(
         "UPDATE assets SET status = $2 WHERE id = $1", 

@@ -63,7 +63,7 @@ describe("BookingService", () => {
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ id: "b1", status: "cancelled" }], rowCount: 1 }); // Update result
 
       const result = await service.cancel("b1", { reason: "Rescheduling" });
-      expect(result.booking.status).toBe("cancelled");
+      expect((result.booking as any).status).toBe("cancelled");
     });
   });
 
@@ -80,7 +80,7 @@ describe("BookingService", () => {
       vi.mocked(db.query).mockResolvedValueOnce({ rows: [{ id: "b1", status: "ongoing" }], rowCount: 1 });
 
       const result = await service.checkin("b1");
-      expect(result.booking.status).toBe("ongoing");
+      expect((result.booking as any).status).toBe("ongoing");
     });
 
     it("rejects check-in outside window", async () => {
