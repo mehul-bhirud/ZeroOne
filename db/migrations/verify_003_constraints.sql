@@ -1,3 +1,5 @@
+-- NOTE: This verifier runs inside a transaction and ends with ROLLBACK on success.
+-- If any statement errors before the final ROLLBACK, psql will stop and leave the session in an aborted transaction; run ROLLBACK manually.
 BEGIN;
 
 SET LOCAL TIME ZONE 'UTC';
