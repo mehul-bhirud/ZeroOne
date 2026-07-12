@@ -39,7 +39,15 @@ interface MaintenanceRequest {
 }
 
 // Formatter helpers
-function formatStatus(status: MRStatus): string {
+type MaintenanceDisplayStatus =
+  | "Pending"
+  | "Approved"
+  | "Rejected"
+  | "Technician Assigned"
+  | "In Progress"
+  | "Resolved";
+
+function formatStatus(status: MRStatus): MaintenanceDisplayStatus {
   switch (status) {
     case "pending": return "Pending";
     case "approved": return "Approved";

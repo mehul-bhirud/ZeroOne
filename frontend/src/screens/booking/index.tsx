@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Button, FormField, Input, ScreenShell, Skeleton, StatusChip, Toast } from "../../design-system";
+import { Button, ErrorSummary, FormField, Input, ScreenShell, Skeleton, StatusChip, Toast } from "../../design-system";
 import { getToken } from "../../auth/api";
 
 // ── Types matching the API contract ──────────────────────────────────────────
@@ -11,7 +11,7 @@ interface Booking {
   booked_by_name?: string;
   start_time: string; // ISO timestamptz
   end_time: string;   // ISO timestamptz
-  status: "Upcoming" | "Ongoing" | "Completed" | "Cancelled" | "No Show";
+  status: "upcoming" | "ongoing" | "completed" | "cancelled" | "no_show";
   reason?: string;
 }
 
@@ -65,6 +65,19 @@ function durationMins(start: string, end: string) {
   return Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
 }
 
+type BookingDisplayStatus = "Upcoming" | "Ongoing" | "Completed" | "Cancelled" | "No Show";
+
+function formatBookingStatus(status: Booking["status"]): BookingDisplayStatus {
+  const labels: Record<Booking["status"], BookingDisplayStatus> = {
+    upcoming: "Upcoming",
+    ongoing: "Ongoing",
+    completed: "Completed",
+    cancelled: "Cancelled",
+    no_show: "No Show",
+  };
+  return labels[status];
+}
+
 const FIXTURE_MODE =
   import.meta.env.DEV && import.meta.env.VITE_USE_FIXTURES === "true";
 
@@ -84,13 +97,13 @@ function mockBookings(assetId: string): Booking[] {
     new Date(now.getFullYear(), now.getMonth(), now.getDate() + d, now.getHours() + offsetHours).toISOString();
 
   if (assetId === "a-001") return [
-    { id: "b-001", asset_id: "a-001", booked_by: "u-1", booked_by_name: "Priya Nair",   start_time: h(-3), end_time: h(-1), status: "Completed" },
-    { id: "b-002", asset_id: "a-001", booked_by: "u-2", booked_by_name: "Ankit Joshi",  start_time: h(1),  end_time: h(3),  status: "Upcoming" },
-    { id: "b-003", asset_id: "a-001", booked_by: "u-3", booked_by_name: "Sneha Iyer",   start_time: h(4),  end_time: h(6),  status: "Upcoming" },
+    { id: "b-001", asset_id: "a-001", booked_by: "u-1", booked_by_name: "Priya Nair",   start_time: h(-3), end_time: h(-1), status: "completed" },
+    { id: "b-002", asset_id: "a-001", booked_by: "u-2", booked_by_name: "Ankit Joshi",  start_time: h(1),  end_time: h(3),  status: "upcoming" },
+    { id: "b-003", asset_id: "a-001", booked_by: "u-3", booked_by_name: "Sneha Iyer",   start_time: h(4),  end_time: h(6),  status: "upcoming" },
   ];
   if (assetId === "a-002") return [
-    { id: "b-004", asset_id: "a-002", booked_by: "u-4", booked_by_name: "Karan Singh",  start_time: h(-1), end_time: h(1),  status: "Ongoing" },
-    { id: "b-005", asset_id: "a-002", booked_by: "u-5", booked_by_name: "Rahul Mehta",  start_time: h(2),  end_time: h(4),  status: "Upcoming" },
+    { id: "b-004", asset_id: "a-002", booked_by: "u-4", booked_by_name: "Karan Singh",  start_time: h(-1), end_time: h(1),  status: "ongoing" },
+    { id: "b-005", asset_id: "a-002", booked_by: "u-5", booked_by_name: "Rahul Mehta",  start_time: h(2),  end_time: h(4),  status: "upcoming" },
   ];
   return [];
 }
@@ -98,6 +111,7 @@ function mockBookings(assetId: string): Booking[] {
 // ── Main component ────────────────────────────────────────────────────────────
 export function BookingScreen() {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
   
   // Asset selection
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
@@ -109,16 +123,19 @@ export function BookingScreen() {
         setAssets(MOCK_ASSETS);
         return;
       }
+      setAssetLoadError(null);
       try {
         const res = await fetch(`${API}/assets`, {
           headers: { Authorization: `Bearer ${getToken() ?? ""}` },
         });
-        if (res.ok) {
-          const data = await res.json();
-          setAssets((data.assets ?? []).filter((a: Asset) => a.is_bookable));
+        if (!res.ok) {
+          const body = await res.json().catch(() => null) as { error?: { message?: string } } | null;
+          throw new Error(body?.error?.message ?? "Unable to load bookable assets. Please try again.");
         }
+        const data = await res.json();
+        setAssets((data.assets ?? []).filter((a: Asset) => a.is_bookable));
       } catch (err) {
-        console.error("Failed to fetch assets", err);
+        setAssetLoadError(err instanceof Error ? err.message : "Unable to load bookable assets. Please try again.");
       }
     }
     void loadAssets();
@@ -556,6 +573,7 @@ export function BookingScreen() {
         {/* ── Asset picker ─────────────────────────────────────── */}
         <section aria-label="Select a resource" style={{ marginBottom: 28 }}>
           <p className="section-title" style={{ marginBottom: 12 }}>Select a Resource</p>
+          {assetLoadError && <ErrorSummary message={assetLoadError} />}
           <div className="asset-picker">
             {assets.map((asset) => (
               <button
@@ -602,7 +620,7 @@ export function BookingScreen() {
                     <div className="timeline-now" style={{ left: `${nowPercent}%` }} aria-hidden="true" />
                     {/* Booking blocks */}
                     {bookings
-                      .filter((b) => b.status !== "Cancelled")
+                      .filter((b) => b.status !== "cancelled")
                       .map((b) => (
                         <div
                           key={b.id}
@@ -638,9 +656,9 @@ export function BookingScreen() {
                     <div className="booking-list">
                       {bookings.map((b) => {
                         const isPending = actionPending[b.id];
-                        const canCheckin  = b.status === "Upcoming" || b.status === "Ongoing";
-                        const canCancel   = b.status === "Upcoming" || b.status === "Ongoing";
-                        const canReschedule = b.status === "Upcoming";
+                        const canCheckin = b.status === "upcoming" || b.status === "ongoing";
+                        const canCancel = b.status === "upcoming" || b.status === "ongoing";
+                        const canReschedule = b.status === "upcoming";
 
                         return (
                           <article key={b.id} className={`booking-card booking-card--${b.status}`}>
@@ -656,7 +674,7 @@ export function BookingScreen() {
                                   {fmtTime(b.start_time).split(",")[0]} · Booked by {b.booked_by_name ?? "Unknown"}
                                 </div>
                               </div>
-                              <StatusChip status={b.status} />
+                              <StatusChip status={formatBookingStatus(b.status)} />
                             </div>
 
                             {(canCheckin || canCancel || canReschedule) && (
@@ -782,7 +800,7 @@ export function BookingScreen() {
                     <div className="overlap-slot-meta">
                       {fmtTime(overlapError.conflicting_booking.start_time).split(",")[0]}
                       {" · "}
-                      <StatusChip status={overlapError.conflicting_booking.status} />
+                      <StatusChip status={formatBookingStatus(overlapError.conflicting_booking.status)} />
                     </div>
                   </div>
                   <p className="overlap-hint">
