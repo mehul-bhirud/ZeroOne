@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+﻿import { useNavigate } from "react-router-dom";
 import { Button, ScreenShell, StatusChip } from "../../design-system";
 import { FeatureNavigation } from "./FeatureNavigation";
 
@@ -16,11 +16,11 @@ const kpi = {
 
 // ── Mock overdue-return rows ──────────────────────────────────────────────────
 const overdueRows = [
-  { id: "OD-001", asset: "MacBook Pro 16″ — SN#MB2341", assignee: "Priya Nair", dept: "Engineering", daysOverdue: 14 },
-  { id: "OD-002", asset: "Canon EOS R5 — SN#CA9921", assignee: "Rahul Mehta", dept: "Marketing", daysOverdue: 9 },
-  { id: "OD-003", asset: "Bosch SHR Drill — SN#BK0032", assignee: "Ankit Joshi", dept: "Facilities", daysOverdue: 6 },
-  { id: "OD-004", asset: "iPad Air 5 — SN#IP7712", assignee: "Sneha Iyer", dept: "HR", daysOverdue: 3 },
-  { id: "OD-005", asset: "Dell Monitor 27″ — SN#DL4458", assignee: "Karan Singh", dept: "Finance", daysOverdue: 1 },
+  { id: "OD-001", asset: "MacBook Pro 16\u2033 \u2014 SN#MB2341", assignee: "Priya Nair", dept: "Engineering", daysOverdue: 14 },
+  { id: "OD-002", asset: "Canon EOS R5 \u2014 SN#CA9921", assignee: "Rahul Mehta", dept: "Marketing", daysOverdue: 9 },
+  { id: "OD-003", asset: "Bosch SHR Drill \u2014 SN#BK0032", assignee: "Ankit Joshi", dept: "Facilities", daysOverdue: 6 },
+  { id: "OD-004", asset: "iPad Air 5 \u2014 SN#IP7712", assignee: "Sneha Iyer", dept: "HR", daysOverdue: 3 },
+  { id: "OD-005", asset: "Dell Monitor 27\u2033 \u2014 SN#DL4458", assignee: "Karan Singh", dept: "Finance", daysOverdue: 1 },
 ];
 
 // ── KPI card config ───────────────────────────────────────────────────────────
@@ -33,17 +33,17 @@ interface KpiConfig {
 }
 
 const kpiCards: KpiConfig[] = [
-  { key: "available_assets",  label: "Available Assets",    icon: "✦",  tone: "positive", note: "Ready to allocate" },
-  { key: "allocated_assets",  label: "Allocated Assets",   icon: "⬡",  tone: "info",     note: "Currently in use" },
-  { key: "maintenance_today", label: "Maintenance Today",  icon: "⚙",  tone: "warning",  note: "Scheduled jobs" },
-  { key: "active_bookings",   label: "Active Bookings",    icon: "◈",  tone: "info",     note: "Live reservations" },
-  { key: "pending_transfers", label: "Pending Transfers",  icon: "⇄",  tone: "warning",  note: "Awaiting approval" },
-  { key: "upcoming_returns",  label: "Upcoming Returns",   icon: "↩",  tone: "neutral",  note: "Due within 7 days" },
-  { key: "overdue_returns",   label: "Overdue Returns",    icon: "⚠",  tone: "danger",   note: "Immediate action" },
-  { key: "ghost_risk",        label: "Ghost Risk",         icon: "◉",  tone: "danger",   note: "Unverified custody" },
+  { key: "available_assets",  label: "Available Assets",   icon: "\u2726",  tone: "positive", note: "Ready to allocate" },
+  { key: "allocated_assets",  label: "Allocated Assets",   icon: "\u2B21",  tone: "info",     note: "Currently in use" },
+  { key: "maintenance_today", label: "Maintenance Today",  icon: "\u2699",  tone: "warning",  note: "Scheduled jobs" },
+  { key: "active_bookings",   label: "Active Bookings",    icon: "\u25C8",  tone: "info",     note: "Live reservations" },
+  { key: "pending_transfers", label: "Pending Transfers",  icon: "\u21C4",  tone: "warning",  note: "Awaiting approval" },
+  { key: "upcoming_returns",  label: "Upcoming Returns",   icon: "\u21A9",  tone: "neutral",  note: "Due within 7 days" },
+  { key: "overdue_returns",   label: "Overdue Returns",    icon: "\u26A0",  tone: "danger",   note: "Immediate action" },
+  { key: "ghost_risk",        label: "Ghost Risk",         icon: "\u25C9",  tone: "danger",   note: "Unverified custody" },
 ];
 
-// Tone → CSS class mapping (uses Sarthak's status-chip tokens as surface colours)
+// Tone -> CSS class mapping (uses Sarthak's status-chip tokens as surface colours)
 const tonePanel: Record<KpiConfig["tone"], string> = {
   positive: "kpi-card--positive",
   info:     "kpi-card--info",
@@ -72,7 +72,7 @@ export function DashboardScreen() {
         .kpi-card {
           border: 1px solid #33404D;
           border-radius: 14px;
-          background: #141A21;        /* .panel background */
+          background: #141A21;
           padding: 22px 20px 18px;
           display: flex;
           flex-direction: column;
@@ -97,7 +97,7 @@ export function DashboardScreen() {
         .kpi-card--danger::before   { background: #FF9AA5; }
         .kpi-card--neutral::before  { background: #C6D0D8; }
 
-        /* Icon bubble — re-uses status-chip surface tokens */
+        /* Icon bubble */
         .kpi-icon {
           width: 36px; height: 36px;
           border-radius: 10px;
@@ -125,7 +125,7 @@ export function DashboardScreen() {
         .overdue-section {
           border: 1px solid #4B2227;
           border-radius: 14px;
-          background: #1A1116;        /* darker tint of danger surface */
+          background: #1A1116;
           padding: 24px;
           margin-bottom: 32px;
         }
@@ -257,6 +257,7 @@ export function DashboardScreen() {
         <div className="feature-nav">
           <FeatureNavigation role="employee" />
         </div>
+
         {/* ── Quick Actions ─────────────────────────────────────── */}
         <section className="quick-actions-section" aria-label="Quick actions">
           <h2 className="quick-actions-title">Quick Actions</h2>
@@ -266,21 +267,21 @@ export function DashboardScreen() {
               className="qa-btn qa-btn--primary"
               onClick={() => navigate("/assets")}
             >
-              <span>＋</span> Register Asset
+              <span>+</span> Register Asset
             </button>
             <button
               id="qa-book-resource"
               className="qa-btn qa-btn--positive"
               onClick={() => navigate("/bookings")}
             >
-              <span>◈</span> Book Resource
+              <span>&#x25C8;</span> Book Resource
             </button>
             <button
               id="qa-raise-maintenance"
               className="qa-btn qa-btn--warning"
               onClick={() => navigate("/maintenance")}
             >
-              <span>⚙</span> Raise Maintenance Request
+              <span>&#x2699;</span> Raise Maintenance Request
             </button>
           </div>
         </section>
@@ -313,9 +314,9 @@ export function DashboardScreen() {
         <section className="overdue-section" aria-label="Overdue returns">
           <div className="overdue-header">
             <div className="overdue-title-row">
-              <span className="overdue-badge" aria-hidden="true">⚠</span>
+              <span className="overdue-badge" aria-hidden="true">&#x26A0;</span>
               <h2 className="overdue-heading">
-                Overdue Returns — {kpi.overdue_returns} assets need immediate action
+                Overdue Returns &mdash; {kpi.overdue_returns} assets need immediate action
               </h2>
             </div>
             {/* Link to Allocation Action screen */}
@@ -324,7 +325,7 @@ export function DashboardScreen() {
               onClick={() => navigate("/allocations")}
               style={{ background: "#FF9AA5", color: "#2C0A10", flexShrink: 0 }}
             >
-              Allocation Action →
+              Allocation Action &rarr;
             </Button>
           </div>
 
