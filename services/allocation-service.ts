@@ -39,8 +39,8 @@ export class AllocationService implements AllocationOperations {
         return { allocation: rows[0] };
       });
     } catch (error: any) {
-      // 23505 is PostgreSQL unique_violation. We rely on the partial unique index for one active allocation.
-      // Also catch state machine transitions from allocated -> allocated.
+      // 23505 is PostgreSQL unique_violation. If we later add a partial unique index for one active allocation,
+      // map it (and the allocated -> allocated transition) to the demo-critical ASSET_ALREADY_ALLOCATED error.
       if (
         (error.code === "23505" && error.constraint === "one_active_allocation") ||
         (error.code === "INVALID_TRANSITION" && error.details?.entity === "Asset" && error.details?.from === "allocated" && error.details?.to === "allocated")
