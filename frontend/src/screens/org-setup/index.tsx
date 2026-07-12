@@ -519,11 +519,13 @@ function CategoryFormModal({
     setError("");
     if (!name.trim()) { setError("Category name is required."); return; }
 
-    const dupeKeys = fields.filter((f, i) =>
-      f.key && fields.findIndex((o) => o.key === f.key) !== i,
-    );
-    if (dupeKeys.length > 0) {
-      setError(`Duplicate field name: ${dupeKeys[0].key}`);
+    const normalizedKeys = fields
+      .map((f) => f.key.trim())
+      .filter(Boolean);
+
+    const dupeKey = normalizedKeys.find((k, i) => normalizedKeys.indexOf(k) !== i);
+    if (dupeKey) {
+      setError(`Duplicate field name: ${dupeKey}`);
       return;
     }
 
