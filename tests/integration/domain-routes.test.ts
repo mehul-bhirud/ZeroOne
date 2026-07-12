@@ -48,7 +48,7 @@ describe("domain HTTP routes", () => {
   afterAll(async () => {
     await pool?.end();
     await appPool?.end();
-    await adminPool?.query(`DROP DATABASE "${databaseName}" WITH (FORCE)`);
+    await adminPool?.query(`DROP DATABASE "${databaseName}"`);
     await adminPool?.end();
   });
 
