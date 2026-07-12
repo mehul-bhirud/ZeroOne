@@ -17,6 +17,9 @@ export const statusTone = {
   Completed: "neutral",
   Cancelled: "neutral",
   "No Show": "danger",
+  Verified: "positive",
+  Damaged: "warning",
+  Missing: "danger",
 } as const;
 
 export type Status = keyof typeof statusTone;
