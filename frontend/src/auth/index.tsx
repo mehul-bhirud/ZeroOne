@@ -201,8 +201,7 @@ export function ForgotPasswordScreen() {
       await forgotPassword(email.trim());
       setSubmitted(true);
     } catch {
-      /* The API always returns accepted: true, so this is a network error */
-      setError("Unable to reach the server. Check your connection and try again.");
+      setError("Unable to send a reset link right now. Please try again later.");
     } finally {
       setPending(false);
     }
