@@ -14,19 +14,30 @@ export class AllocationService implements AllocationOperations {
     }
 
     try {
-      const sql = `
-        INSERT INTO allocations (id, asset_id, holder_type, holder_id, expected_return_date, allocated_at)
-        VALUES (gen_random_uuid(), $1, $2, $3, $4, now())
-        RETURNING *
-      `;
-      const params = [asset_id, holder_type, holder_id, expected_return_date];
-      
-      const { rows } = await this.db.query(sql, params);
-      
-      // We also need to update the asset state to allocated
-      await this.db.query(`UPDATE assets SET status = 'allocated' WHERE id = $1`, [asset_id]);
-      
-      return { allocation: rows[0] };
+      return await this.db.transaction(async (client) => {
+        const { rows: assetRows } = await client.query<{ status: string }>(
+          `SELECT status FROM assets WHERE id = $1 FOR UPDATE`,
+          [asset_id],
+        );
+        if (assetRows.length === 0) {
+          throw new ValidationError("Invalid asset_id");
+        }
+
+        assetStateMachine.transition(assetRows[0].status as any, "allocated");
+
+        const sql = `
+          INSERT INTO allocations (id, asset_id, holder_type, holder_id, expected_return_date, allocated_at)
+          VALUES (gen_random_uuid(), $1, $2, $3, $4, now())
+          RETURNING *
+        `;
+        const params = [asset_id, holder_type, holder_id, expected_return_date];
+
+        const { rows } = await client.query(sql, params);
+
+        await client.query(`UPDATE assets SET status = 'allocated' WHERE id = $1`, [asset_id]);
+
+        return { allocation: rows[0] };
+      });
     } catch (error: any) {
       // 23505 is PostgreSQL unique_violation. We rely on the partial unique index.
       if (error.code === '23505' && error.constraint === 'one_active_allocation') {
