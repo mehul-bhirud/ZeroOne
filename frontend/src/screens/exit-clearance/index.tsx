@@ -2,8 +2,15 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button, EmptyState, ErrorSummary, FormField, Input, ScreenShell, StatusChip, Toast } from "../../design-system";
 import { getToken } from "../../auth/api";
+import { useAuth } from "../../auth/AuthContext";
 
 const API_BASE = "/api/v1";
+
+function formatDate(value: unknown): string {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value))
+    ? new Date(value).toLocaleString()
+    : "Date unavailable";
+}
 
 async function mFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -32,6 +39,7 @@ interface ClearanceData {
 }
 
 export function ExitClearanceScreen() {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const initialEmpId = searchParams.get("employee_id") || "";
   
@@ -87,7 +95,8 @@ export function ExitClearanceScreen() {
       if (clearanceData) {
         setClearanceData({
           ...clearanceData,
-          active_allocations: clearanceData.active_allocations.filter((a: any) => a.id !== allocationId)
+          active_allocations: clearanceData.active_allocations.filter((a: any) => a.id !== allocationId),
+          checklist: clearanceData.checklist?.filter((item: any) => item.id !== allocationId),
         });
       }
     } catch (err: any) {
@@ -105,12 +114,17 @@ export function ExitClearanceScreen() {
       if (clearanceData) {
         setClearanceData({
           ...clearanceData,
-          upcoming_bookings: clearanceData.upcoming_bookings.filter((b: any) => b.id !== bookingId)
+          upcoming_bookings: clearanceData.upcoming_bookings.filter((b: any) => b.id !== bookingId),
+          checklist: clearanceData.checklist?.filter((item: any) => item.id !== bookingId),
         });
       }
     } catch (err: any) {
       alert(err.message || "Failed to cancel booking");
     }
+  }
+
+  if (user?.role !== "admin") {
+    return <ScreenShell title="Exit Clearance" description="Resolve every active allocation and upcoming booking before deactivating an employee."><ErrorSummary message="Only Admin users can initiate employee deactivation." /></ScreenShell>;
   }
 
   return (
@@ -174,7 +188,7 @@ export function ExitClearanceScreen() {
                       <div key={alloc.id} className="blocker-item">
                         <div>
                           <div className="blocker-title">{alloc.asset?.name || alloc.asset_id}</div>
-                          <div className="blocker-meta">Allocated since: {new Date(alloc.assigned_at || Date.now()).toLocaleDateString()}</div>
+                          <div className="blocker-meta">Allocated since: {formatDate(alloc.allocated_at || alloc.assigned_at)}</div>
                         </div>
                         <div style={{ display: "flex", gap: 8 }}>
                           <Button style={{ background: "transparent", color: "#F3F6F8", border: "1px solid #33404D" }} onClick={() => navigate("/transfer-requests")}>Transfer</Button>
@@ -193,7 +207,7 @@ export function ExitClearanceScreen() {
                         <div>
                           <div className="blocker-title">{booking.asset?.name || booking.asset_id}</div>
                           <div className="blocker-meta">
-                            {new Date(booking.start_time).toLocaleString()} - {new Date(booking.end_time).toLocaleString()}
+                            {formatDate(booking.start_time)} - {formatDate(booking.end_time)}
                           </div>
                         </div>
                         <Button style={{ background: "#4B2227", color: "#FF9AA5", border: "1px solid #6D2932" }} onClick={() => handleCancelBooking(booking.id)}>Cancel Booking</Button>

@@ -8,7 +8,7 @@ import { createAuthAppFromDatabase } from "../../auth/app";
 import { loadAuthConfig } from "../../auth/config";
 
 const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5432/postgres";
-const migrationFiles = ["001_extensions.sql", "002_schema_v0.sql", "003_canonical_constraints.sql", "004_activity_log_append_only.sql"];
+const migrationFiles = ["001_extensions.sql", "002_schema_v0.sql", "003_canonical_constraints.sql"];
 let databaseName: string;
 let adminPool: Pool;
 let pool: Pool;
@@ -65,11 +65,26 @@ describe("domain HTTP routes", () => {
     expect(bookings.status).toBe(200);
     expect(bookings.body).toEqual({ bookings: [] });
 
+    const notifications = await request(app).get("/api/v1/notifications").set("Authorization", `Bearer ${token}`);
+    expect(notifications.status).toBe(200);
+    expect(notifications.body).toEqual({ notifications: [], unread_count: 0 });
+
+    const activity = await request(app).get("/api/v1/activity-log").set("Authorization", `Bearer ${token}`);
+    expect(activity.status).toBe(200);
+    expect(activity.body).toEqual({ activity: [] });
+
     const passport = await request(app).get(`/api/v1/assets/${assetId}`).set("Authorization", `Bearer ${token}`);
     expect(passport.status).toBe(200);
     expect(passport.body.asset).toMatchObject({ id: assetId, name: "Route Test Asset" });
     expect(passport.body).toMatchObject({ allocations: [], transfer_requests: [], bookings: [], maintenance_requests: [], audit_findings: [], activity: [] });
     expect((await request(app).patch(`/api/v1/assets/${assetId}`).set("Authorization", `Bearer ${token}`).send({ status: "retired" })).status).toBe(403);
+
+    const allocationId = randomUUID();
+    await pool.query(`
+      INSERT INTO allocations (id, asset_id, holder_type, holder_id, allocated_at)
+      VALUES ($1, $2, 'user', $3, CURRENT_TIMESTAMP)
+    `, [allocationId, assetId, randomUUID()]);
+    expect((await request(app).post(`/api/v1/allocations/${allocationId}/return`).set("Authorization", `Bearer ${token}`).send({ action: "request" })).status).toBe(403);
 
     const maintenance = await request(app).get("/api/v1/maintenance-requests").set("Authorization", `Bearer ${token}`);
     expect(maintenance.status).toBe(200);

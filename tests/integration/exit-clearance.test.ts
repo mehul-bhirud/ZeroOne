@@ -13,8 +13,6 @@ const migrationFiles = [
   "001_extensions.sql",
   "002_schema_v0.sql",
   "003_canonical_constraints.sql",
-  "004_activity_log_append_only.sql",
-  "005_analytics_views.sql",
   "006_exit_clearance.sql",
 ];
 

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from "react";
-import { ScreenShell, Skeleton, StatusChip, Button, EmptyState } from "../../design-system";
+import { ScreenShell, Skeleton, Button, EmptyState, ErrorSummary } from "../../design-system";
 import { getToken } from "../../auth/api";
 
 const API_BASE = "/api/v1";
@@ -28,16 +28,25 @@ interface Notification {
   type: string;
   message: string;
   read: boolean;
-  created_at: string;
+  created_at?: string;
 }
 
 interface ActivityLog {
   id: string;
-  actor: string;
+  actor?: string;
+  actor_id?: string;
   action: string;
   entity_type: string;
-  entity_identifier: string;
-  timestamp: string;
+  entity_identifier?: string;
+  entity_id?: string;
+  timestamp?: string | null;
+  created_at?: string;
+}
+
+function formatDate(value: unknown): string {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value))
+    ? new Date(value).toLocaleString()
+    : "Date unavailable";
 }
 
 export function NotificationsScreen() {
@@ -52,6 +61,7 @@ export function NotificationsScreen() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [filterAction, setFilterAction] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (activeTab === "notifications") {
@@ -63,12 +73,13 @@ export function NotificationsScreen() {
 
   async function fetchNotifications() {
     setLoadingNotifs(true);
+    setLoadError("");
     try {
       const data = await mFetch<{ notifications: Notification[]; unread_count: number }>("/notifications");
       setNotifications(data.notifications || []);
       setUnreadCount(data.unread_count || 0);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Unable to load notifications.");
     } finally {
       setLoadingNotifs(false);
     }
@@ -76,12 +87,13 @@ export function NotificationsScreen() {
 
   async function fetchActivityLog() {
     setLoadingActivity(true);
+    setLoadError("");
     try {
       const qs = filterAction ? `?action=${encodeURIComponent(filterAction)}` : "";
       const data = await mFetch<{ activity: ActivityLog[] }>(`/activity-log${qs}`);
       setActivityLogs(data.activity || []);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setLoadError(err?.message || "Unable to load activity log.");
     } finally {
       setLoadingActivity(false);
     }
@@ -137,6 +149,7 @@ export function NotificationsScreen() {
             Activity Log
           </button>
         </div>
+        {loadError && <ErrorSummary message={loadError} />}
 
         {activeTab === "notifications" && (
           <div>
@@ -150,7 +163,7 @@ export function NotificationsScreen() {
                   <div key={n.id} className={`notif-card ${n.read ? "" : "unread"}`}>
                     <div>
                       <div className="notif-msg">{n.message}</div>
-                      <div className="notif-time">{new Date(n.created_at).toLocaleString()}</div>
+                      <div className="notif-time">{formatDate(n.created_at)}</div>
                     </div>
                     {!n.read && (
                       <Button style={{ background: "transparent", color: "#F3F6F8", border: "1px solid #33404D" }} onClick={() => handleMarkRead(n.id)}>Mark Read</Button>
@@ -192,11 +205,11 @@ export function NotificationsScreen() {
                 <tbody>
                   {activityLogs.map(log => (
                     <tr key={log.id}>
-                      <td>{log.actor}</td>
+                      <td>{log.actor || log.actor_id || "System"}</td>
                       <td><span style={{color: "#8FC8FF", background: "#19334E", padding: "2px 6px", borderRadius: 4, fontSize: 11, fontWeight: 700}}>{log.action}</span></td>
                       <td>{log.entity_type}</td>
-                      <td>{log.entity_identifier}</td>
-                      <td>{new Date(log.timestamp).toLocaleString()}</td>
+                      <td>{log.entity_identifier || log.entity_id || "—"}</td>
+                      <td>{formatDate(log.timestamp || log.created_at)}</td>
                     </tr>
                   ))}
                 </tbody>

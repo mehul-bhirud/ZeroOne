@@ -139,6 +139,7 @@ function AppRoutes() {
                 <Route path="/assets" element={<AssetRegistryScreen />} />
                 <Route path="/assets/:id" element={<AssetPassportScreen />} />
                 <Route path="/allocations" element={<AllocationScreen />} />
+                <Route path="/transfer-requests" element={<AllocationScreen />} />
                 <Route path="/bookings" element={<BookingScreen />} />
                 <Route path="/maintenance" element={<MaintenanceScreen />} />
                 <Route path="/audits" element={<AuditScreen />} />
