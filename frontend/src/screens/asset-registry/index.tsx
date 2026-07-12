@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   Button,
   EmptyState,
@@ -19,6 +19,8 @@ import {
   createAsset,
   getCategories,
   getDepartments,
+  getAssetById,
+  updateAsset,
   type Asset,
   type AssetStatus,
 } from "./api";
@@ -209,6 +211,32 @@ export function AssetRegistryScreen() {
   );
 }
 
+type TimelineEntry = {
+  date: string | null;
+  type: string;
+  title: string;
+  desc: string;
+};
+
+function firstValidDate(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && !Number.isNaN(Date.parse(value))) return value;
+  }
+  return null;
+}
+
+function formatTimelineDate(value: string | null): string {
+  return value ? new Date(value).toLocaleString() : "Date unavailable";
+}
+
+function formatDateRange(start: unknown, end: unknown): string {
+  const startValue = firstValidDate(start);
+  const endValue = firstValidDate(end);
+  const startText = startValue ? new Date(startValue).toLocaleString() : "unknown start";
+  const endText = endValue ? new Date(endValue).toLocaleString() : "unknown end";
+  return `From ${startText} to ${endText}`;
+}
+
 const assetStatusLabels: Record<AssetStatus, Status> = {
   available: "Available",
   allocated: "Allocated",
@@ -352,11 +380,9 @@ function RegisterAssetModal({
   );
 }
 
-import { useParams } from "react-router-dom";
-import { getAssetById, updateAsset } from "./api";
-
 export function AssetPassportScreen() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -369,7 +395,7 @@ export function AssetPassportScreen() {
 
   useEffect(() => {
     if (id) {
-      loadData(id);
+      void loadData(id);
     }
   }, [id]);
 
@@ -397,7 +423,7 @@ export function AssetPassportScreen() {
     try {
       await updateAsset(id, { status: newStatus });
       setEditingStatus(false);
-      loadData(id);
+      await loadData(id);
       setToast("Status updated successfully.");
       setTimeout(() => setToast(""), 3000);
     } catch (err: any) {
@@ -414,20 +440,25 @@ export function AssetPassportScreen() {
   const categoryName = categories.find(c => c.id === asset.category_id)?.name || "Unknown";
 
   // Build chronological timeline
-  const timeline: { date: string; type: string; title: string; desc: string }[] = [];
+  const timeline: TimelineEntry[] = [];
   
-  allocations?.forEach((a: any) => timeline.push({ date: a.allocated_at, type: "allocation", title: "Allocated", desc: `To ${a.holder_type}` }));
-  transfer_requests?.forEach((t: any) => timeline.push({ date: t.created_at, type: "transfer", title: "Transfer Request", desc: `Status: ${t.status}` }));
-  bookings?.forEach((b: any) => timeline.push({ date: b.created_at, type: "booking", title: "Booking Created", desc: `From ${b.start_date} to ${b.end_date}` }));
-  maintenance_requests?.forEach((m: any) => timeline.push({ date: m.created_at, type: "maintenance", title: "Maintenance", desc: m.issue_description }));
-  audit_findings?.forEach((af: any) => timeline.push({ date: af.created_at, type: "audit", title: "Audit Finding", desc: `Status: ${af.status}` }));
-  activity?.forEach((act: any) => timeline.push({ date: act.created_at, type: "activity", title: "Activity", desc: act.action }));
+  allocations?.forEach((a: any) => timeline.push({ date: firstValidDate(a.allocated_at, a.created_at), type: "allocation", title: "Allocated", desc: `To ${a.holder_type}` }));
+  transfer_requests?.forEach((t: any) => timeline.push({ date: firstValidDate(t.created_at, t.requested_at, t.approved_at), type: "transfer", title: "Transfer Request", desc: `Status: ${t.status}` }));
+  bookings?.forEach((b: any) => timeline.push({ date: firstValidDate(b.created_at, b.start_time, b.start_date), type: "booking", title: "Booking Created", desc: formatDateRange(b.start_time ?? b.start_date, b.end_time ?? b.end_date) }));
+  maintenance_requests?.forEach((m: any) => timeline.push({ date: firstValidDate(m.created_at, m.updated_at), type: "maintenance", title: "Maintenance", desc: m.issue_description || `Status: ${m.status}` }));
+  audit_findings?.forEach((af: any) => timeline.push({ date: firstValidDate(af.created_at, af.updated_at, af.date), type: "audit", title: "Audit Finding", desc: af.notes || `Status: ${af.result ?? af.status}` }));
+  activity?.forEach((act: any) => timeline.push({ date: firstValidDate(act.created_at, act.logged_at, act.timestamp), type: "activity", title: "Activity", desc: act.action }));
 
   // Push creation event
-  timeline.push({ date: asset.created_at || asset.acquisition_date || new Date().toISOString(), type: "creation", title: "Asset Registered", desc: `Acquired on ${asset.acquisition_date}` });
+  timeline.push({ date: firstValidDate(asset.created_at, asset.acquisition_date), type: "creation", title: "Asset Registered", desc: `Acquired on ${asset.acquisition_date}` });
 
   // Sort newest first
-  timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  timeline.sort((a, b) => {
+    if (!a.date && !b.date) return 0;
+    if (!a.date) return 1;
+    if (!b.date) return -1;
+    return Date.parse(b.date) - Date.parse(a.date);
+  });
 
   return (
     <ScreenShell title={`Passport: ${asset.name}`} description={`Asset Tag: ${asset.asset_tag} | Serial: ${asset.serial_number}`}>
@@ -446,7 +477,7 @@ export function AssetPassportScreen() {
                   <div>
                     <div style={{ fontWeight: 600 }}>{item.title}</div>
                     <div style={{ fontSize: 13, color: "#9EABB8", marginBottom: 4 }}>
-                      {new Date(item.date).toLocaleString()}
+                      {formatTimelineDate(item.date)}
                     </div>
                     <div style={{ fontSize: 14 }}>{item.desc}</div>
                   </div>
@@ -481,7 +512,9 @@ export function AssetPassportScreen() {
             ) : (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <StatusChip status={asset.status.replace("_", " ") as any} />
-                <button className="button button--outline button--sm" onClick={() => { setEditingStatus(true); setNewStatus(asset.status); }}>Update</button>
+                {(user?.role === "admin" || user?.role === "asset_manager") && (
+                  <button className="button button--outline button--sm" onClick={() => { setEditingStatus(true); setNewStatus(asset.status); }}>Update</button>
+                )}
               </div>
             )}
           </div>

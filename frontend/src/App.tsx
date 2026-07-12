@@ -2,7 +2,7 @@ import { Link, Navigate, Route, Routes } from "react-router-dom";
 import { LoginScreen, SignupScreen, ForgotPasswordScreen } from "./auth";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { AllocationScreen } from "./screens/allocation";
-import { AssetRegistryScreen } from "./screens/asset-registry";
+import { AssetPassportScreen, AssetRegistryScreen } from "./screens/asset-registry";
 import { OrgSetupScreen } from "./screens/org-setup";
 import { AuditScreen } from "./screens/audit";
 import { BookingScreen } from "./screens/booking";
@@ -137,6 +137,7 @@ function AppRoutes() {
                 <Route path="/dashboard" element={<DashboardScreen />} />
                 <Route path="/org-setup" element={<OrgSetupScreen />} />
                 <Route path="/assets" element={<AssetRegistryScreen />} />
+                <Route path="/assets/:id" element={<AssetPassportScreen />} />
                 <Route path="/allocations" element={<AllocationScreen />} />
                 <Route path="/bookings" element={<BookingScreen />} />
                 <Route path="/maintenance" element={<MaintenanceScreen />} />

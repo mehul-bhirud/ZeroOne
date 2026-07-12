@@ -60,7 +60,23 @@ export class AssetService implements AssetOperations {
     if (rows.length === 0) {
       throw new ValidationError("Asset not found");
     }
-    return { asset: rows[0], allocations: [], transfer_requests: [], bookings: [], maintenance_requests: [], audit_findings: [], activity: [] };
+    const [allocations, transferRequests, bookings, maintenanceRequests, auditFindings, activity] = await Promise.all([
+      this.db.query(`SELECT * FROM allocations WHERE asset_id = $1 ORDER BY allocated_at DESC`, [id]),
+      this.db.query(`SELECT * FROM transfer_requests WHERE asset_id = $1 ORDER BY status, id`, [id]),
+      this.db.query(`SELECT * FROM bookings WHERE asset_id = $1 ORDER BY start_time DESC`, [id]),
+      this.db.query(`SELECT * FROM maintenance_requests WHERE asset_id = $1 ORDER BY status, id`, [id]),
+      this.db.query(`SELECT * FROM audit_findings WHERE asset_id = $1 ORDER BY audit_cycle_id DESC`, [id]),
+      this.db.query(`SELECT * FROM activity_log WHERE entity_type = 'Asset' AND entity_id = $1 ORDER BY id DESC`, [id]),
+    ]);
+    return {
+      asset: rows[0],
+      allocations: allocations.rows,
+      transfer_requests: transferRequests.rows,
+      bookings: bookings.rows,
+      maintenance_requests: maintenanceRequests.rows,
+      audit_findings: auditFindings.rows,
+      activity: activity.rows,
+    };
   }
 
   async update(id: Identifier, input: JsonRecord): Promise<JsonRecord> {

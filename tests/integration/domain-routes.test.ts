@@ -14,6 +14,7 @@ let adminPool: Pool;
 let pool: Pool;
 let appPool: Pool;
 let app: ReturnType<typeof createAuthAppFromDatabase>["app"];
+let assetId: string;
 
 describe("domain HTTP routes", () => {
   beforeAll(async () => {
@@ -28,10 +29,11 @@ describe("domain HTTP routes", () => {
     }
     const categoryId = randomUUID();
     await pool.query("INSERT INTO asset_categories (id, name) VALUES ($1, 'Route Test')", [categoryId]);
+    assetId = randomUUID();
     await pool.query(`
       INSERT INTO assets (id, name, category_id, serial_number, acquisition_date, condition, location, is_bookable)
       VALUES ($1, 'Route Test Asset', $2, 'ROUTE-TEST-1', CURRENT_DATE, 'good', 'HQ', true)
-    `, [randomUUID(), categoryId]);
+    `, [assetId, categoryId]);
     const created = createAuthAppFromDatabase(loadAuthConfig({
       JWT_SECRET: "domain-route-test-secret-that-is-longer-than-32-characters",
       JWT_ISSUER: "assetflow",
@@ -62,6 +64,12 @@ describe("domain HTTP routes", () => {
     const bookings = await request(app).get("/api/v1/bookings").set("Authorization", `Bearer ${token}`);
     expect(bookings.status).toBe(200);
     expect(bookings.body).toEqual({ bookings: [] });
+
+    const passport = await request(app).get(`/api/v1/assets/${assetId}`).set("Authorization", `Bearer ${token}`);
+    expect(passport.status).toBe(200);
+    expect(passport.body.asset).toMatchObject({ id: assetId, name: "Route Test Asset" });
+    expect(passport.body).toMatchObject({ allocations: [], transfer_requests: [], bookings: [], maintenance_requests: [], audit_findings: [], activity: [] });
+    expect((await request(app).patch(`/api/v1/assets/${assetId}`).set("Authorization", `Bearer ${token}`).send({ status: "retired" })).status).toBe(403);
 
     const maintenance = await request(app).get("/api/v1/maintenance-requests").set("Authorization", `Bearer ${token}`);
     expect(maintenance.status).toBe(200);
