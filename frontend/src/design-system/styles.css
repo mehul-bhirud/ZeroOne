@@ -90,7 +90,7 @@ button { -webkit-tap-highlight-color: transparent; }
   font-size: 14px;
   font-weight: 900;
 }
-.app-nav { display: grid; gap: 4px; flex: 1; padding: 4px; }
+.app-nav { display: grid; align-content: start; gap: 4px; flex: 1; padding: 4px; }
 .app-nav-link {
   display: flex;
   align-items: center;
