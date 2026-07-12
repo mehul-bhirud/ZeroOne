@@ -1,7 +1,9 @@
+import { getToken } from "../../auth/api";
+
 const API_BASE = "/api/v1";
 
 function authHeaders(): Record<string, string> {
-  const token = localStorage.getItem("af_access_token");
+  const token = getToken();
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
