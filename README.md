@@ -23,6 +23,8 @@ Future Codex work is expected to continue on Vishvesh's `feature/data-layer` bra
 
 The API base path is `/api/v1`. The locked endpoint contract and complete specification are in `docs/`.
 
+For a local demo database, apply migrations `001_extensions.sql` through `004_activity_log_append_only.sql`, set `MIGRATION_DATABASE_URL`, `SEED_ALLOW_RESET=true`, and a development-only `SEED_DEMO_PASSWORD`, then run `npm run db:seed` followed by `npm run db:seed:verify`. The seed is intentionally destructive and refuses non-local databases.
+
 ## Architecture
 
 ```text
@@ -43,4 +45,3 @@ The scaffold intentionally exposes interfaces and placeholders without pretendin
 - `docs/ERD.md` — initial canonical entity relationship draft
 
 The operating documents mention two original hackathon PDFs, but they were not present in the supplied source directory and therefore are not committed.
-

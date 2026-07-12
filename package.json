@@ -5,22 +5,35 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config frontend/vite.config.ts",
+    "dev:auth": "tsx auth/server.ts",
+    "db:seed": "tsx db/seed/index.ts",
+    "db:seed:verify": "tsx db/seed/verify.ts",
     "build": "tsc --noEmit && vite build --config frontend/vite.config.ts",
-    "test": "vitest run",
+    "test": "vitest run --exclude auth/__tests__/integration.test.ts",
+    "test:auth:integration": "vitest run auth/__tests__/integration.test.ts",
     "test:watch": "vitest",
     "check": "npm run build && npm test"
   },
   "dependencies": {
+    "@types/express": "latest",
+    "@types/node": "latest",
+    "@types/pg": "latest",
+    "@types/supertest": "latest",
     "@vitejs/plugin-react": "latest",
+    "express": "latest",
+    "jose": "latest",
+    "pg": "latest",
+    "supertest": "latest",
     "vite": "latest",
     "typescript": "latest",
     "vitest": "latest",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
+    "tsx": "latest",
+    "zod": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest"
   },
   "devDependencies": {}
 }
-
