@@ -4,7 +4,7 @@ The seed is a destructive, exact development rebuild. It refuses to run unless `
 
 ```powershell
 $env:SEED_ALLOW_RESET = "true"
-$env:SEED_DEMO_PASSWORD = "replace-with-a-development-only-password"
+$env:SEED_DEMO_PASSWORD = Read-Host "Enter a development-only demo password"
 npm run db:seed
 npm run db:seed:verify
 ```

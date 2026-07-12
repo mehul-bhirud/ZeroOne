@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { Pool, type PoolClient } from "pg";
 import { hashPassword } from "../../auth/password";
 
@@ -77,7 +76,8 @@ function requireSeedConfig(env: NodeJS.ProcessEnv): { connectionString: string; 
   if (!connectionString) throw new Error("MIGRATION_DATABASE_URL or DATABASE_URL is required for seeding.");
   const url = new URL(connectionString);
   const databaseName = decodeURIComponent(url.pathname.slice(1));
-  if (!['localhost', '127.0.0.1', '::1'].includes(url.hostname) || /^(postgres|template0|template1)$/i.test(databaseName)) {
+  const productionLikeName = /(^|[_-])(prod|production|stage|staging)([_-]|$)/i.test(databaseName);
+  if (!databaseName || !['localhost', '127.0.0.1', '::1'].includes(url.hostname) || /^(postgres|template0|template1)$/i.test(databaseName) || productionLikeName) {
     throw new Error("Refusing destructive seed outside a local development database.");
   }
   const password = env.SEED_DEMO_PASSWORD ?? "";
@@ -105,7 +105,7 @@ async function insertFixtures(client: PoolClient, now: Date, password: string): 
   }
   const allocations = [
     ["50000000-0000-0000-0000-000000000001", ids.assets[0], ids.users[4], -20, -10, null],
-    ["50000000-0000-0000-0000-000000000002", ids.assets[1], ids.users[5], -15, 3, null],
+    ["50000000-0000-0000-0000-000000000002", ids.assets[1], ids.users[6], -15, 3, null],
     ["50000000-0000-0000-0000-000000000003", ids.assets[2], ids.users[6], -8, null, null],
     ["50000000-0000-0000-0000-000000000004", ids.assets[3], ids.users[4], -60, -50, -50],
     ["50000000-0000-0000-0000-000000000005", ids.assets[4], ids.users[5], -70, -65, -65],
@@ -127,8 +127,9 @@ async function insertFixtures(client: PoolClient, now: Date, password: string): 
     await client.query("INSERT INTO bookings (id, asset_id, booked_by, start_time, end_time, status) VALUES ($1, $2, $3, $4, $5, $6)", [id, assetId, bookedBy, start, end, status]);
   }
   const maintenanceStatuses = ["pending", "approved", "rejected", "technician_assigned", "in_progress", "resolved"];
+  const maintenanceAssetIndexes = [3, 4, 5, 7, 8, 17];
   for (let index = 0; index < maintenanceStatuses.length; index += 1) {
-    await client.query("INSERT INTO maintenance_requests (id, asset_id, raised_by, issue_description, priority, status, technician) VALUES ($1, $2, $3, $4, $5, $6, $7)", [`80000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`, ids.assets[index + 3], ids.users[(index % 4) + 4], `Seeded maintenance issue ${index + 1}`, index < 2 ? "high" : "medium", maintenanceStatuses[index], index >= 3 ? "Technician Demo" : null]);
+    await client.query("INSERT INTO maintenance_requests (id, asset_id, raised_by, issue_description, priority, status, technician) VALUES ($1, $2, $3, $4, $5, $6, $7)", [`80000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`, ids.assets[maintenanceAssetIndexes[index]], ids.users[(index % 4) + 4], `Seeded maintenance issue ${index + 1}`, index < 2 ? "high" : "medium", maintenanceStatuses[index], index >= 3 ? "Technician Demo" : null]);
   }
   await client.query("INSERT INTO audit_cycles (id, scope_department_id, scope_location, date_range_start, date_range_end, status, created_by) VALUES ($1, $2, 'HQ', $3, $4, 'active', $5), ($6, $7, 'HQ', $8, $9, 'closed', $10)", ["90000000-0000-0000-0000-000000000001", ids.departments[1], daysFrom(now, -1), daysFrom(now, 30), ids.users[0], "90000000-0000-0000-0000-000000000002", ids.departments[0], daysFrom(now, -60), daysFrom(now, -30), ids.users[0]]);
   await client.query("INSERT INTO audit_assignments (id, audit_cycle_id, auditor_id) VALUES ($1, $2, $3), ($4, $5, $6), ($7, $8, $9)", ["91000000-0000-0000-0000-000000000001", "90000000-0000-0000-0000-000000000001", ids.users[1], "91000000-0000-0000-0000-000000000002", "90000000-0000-0000-0000-000000000001", ids.users[2], "91000000-0000-0000-0000-000000000003", "90000000-0000-0000-0000-000000000002", ids.users[3]]);
@@ -137,7 +138,7 @@ async function insertFixtures(client: PoolClient, now: Date, password: string): 
     await client.query("INSERT INTO notifications (id, user_id, type, message, read) VALUES ($1, $2, $3, $4, $5)", [`93000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`, ids.users[index % users.length], index % 2 === 0 ? "allocation" : "audit", index % 2 === 0 ? "A seeded asset is awaiting custody review." : "A seeded audit finding needs attention.", index > 4]);
   }
   for (let index = 0; index < expectedSeedCounts.activity_log; index += 1) {
-    await client.query("INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata) VALUES ($1, $2, $3, $4, $5, $6::jsonb)", [randomUUID(), users[index % users.length].id, index % 2 === 0 ? "asset.updated" : "allocation.created", index % 2 === 0 ? "Asset" : "Allocation", index % 2 === 0 ? ids.assets[index % assets.length] : `50000000-0000-0000-0000-00000000000${(index % 5) + 1}`, JSON.stringify({ occurred_at: hoursFrom(now, -index).toISOString(), source: "seed" })]);
+    await client.query("INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata) VALUES ($1, $2, $3, $4, $5, $6::jsonb)", [`95000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`, users[index % users.length].id, index % 2 === 0 ? "asset.updated" : "allocation.created", index % 2 === 0 ? "Asset" : "Allocation", index % 2 === 0 ? ids.assets[index % assets.length] : `50000000-0000-0000-0000-00000000000${(index % 5) + 1}`, JSON.stringify({ occurred_at: hoursFrom(now, -index).toISOString(), source: "seed" })]);
   }
 }
 
@@ -157,6 +158,16 @@ export async function assertSeed(client: PoolClient): Promise<Record<string, num
   if (Number(overdueCount.rows[0].count) < 1) throw new Error("Seed verification failed: an overdue allocation is required.");
   const missingCount = await client.query<{ count: string }>("SELECT count(*)::text AS count FROM audit_findings WHERE result = 'missing' AND audit_cycle_id = '90000000-0000-0000-0000-000000000001'");
   if (Number(missingCount.rows[0].count) < 1) throw new Error("Seed verification failed: confirmed-missing audit data is required.");
+  const tags = await client.query<{ asset_tag: string }>("SELECT asset_tag FROM assets ORDER BY id");
+  const expectedTags = Array.from({ length: expectedSeedCounts.assets }, (_, index) => `AF-${String(index + 1).padStart(4, "0")}`);
+  if (tags.rows.map((row) => row.asset_tag).join(",") !== expectedTags.join(",")) throw new Error("Seed verification failed: asset tags are not deterministic.");
+  const activityIds = await client.query<{ id: string }>("SELECT id::text AS id FROM activity_log ORDER BY id");
+  const expectedActivityIds = Array.from({ length: expectedSeedCounts.activity_log }, (_, index) => `95000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`);
+  if (activityIds.rows.map((row) => row.id).join(",") !== expectedActivityIds.join(",")) throw new Error("Seed verification failed: ActivityLog IDs are not deterministic.");
+  const inconsistentMaintenance = await client.query<{ count: string }>("SELECT count(*)::text AS count FROM maintenance_requests m JOIN assets a ON a.id = m.asset_id WHERE m.status = 'resolved' AND a.status = 'under_maintenance'");
+  if (Number(inconsistentMaintenance.rows[0].count) !== 0) throw new Error("Seed verification failed: resolved maintenance cannot leave an asset under maintenance.");
+  const approvedTransfer = await client.query<{ count: string }>("SELECT count(*)::text AS count FROM transfer_requests t JOIN allocations a ON a.asset_id = t.asset_id AND a.returned_at IS NULL WHERE t.status = 'approved' AND a.holder_id = (t.to_holder->>'id')::uuid");
+  if (Number(approvedTransfer.rows[0].count) < 1) throw new Error("Seed verification failed: approved transfer custody does not match the destination holder.");
   return summary;
 }
 
@@ -172,7 +183,9 @@ export async function runSeed(env: NodeJS.ProcessEnv = process.env): Promise<Rec
     await insertFixtures(client, now, password);
     const summary = await assertSeed(client);
     await client.query("COMMIT");
-    console.log(JSON.stringify({ seed: "assetflow-v1", generated_at: now.toISOString(), counts: summary, overlap_probe: { asset_id: ids.assets[5], start: "09:30", end: "10:30", expected: "BOOKING_OVERLAP" } }, null, 2));
+    const probeStart = daysFrom(now, 1); probeStart.setUTCHours(9, 30, 0, 0);
+    const probeEnd = new Date(probeStart.getTime() + 60 * 60 * 1000);
+    console.log(JSON.stringify({ seed: "assetflow-v1", generated_at: now.toISOString(), counts: summary, overlap_probe: { asset_id: ids.assets[5], start_time: probeStart.toISOString(), end_time: probeEnd.toISOString(), expected: "BOOKING_OVERLAP" } }, null, 2));
     return summary;
   } catch (error) {
     await client.query("ROLLBACK");
