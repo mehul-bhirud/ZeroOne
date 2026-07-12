@@ -45,66 +45,37 @@ function AppLayout({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <nav
-        style={{
-          width: 220,
-          flexShrink: 0,
-          background: "#141A21",
-          borderRight: "1px solid #33404D",
-          padding: "24px 0",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <div style={{ padding: "0 20px 20px", borderBottom: "1px solid #33404D" }}>
-          <span className="eyebrow" style={{ fontSize: 13 }}>AssetFlow</span>
+    <div className="app-shell">
+      <nav className="app-sidebar" aria-label="Primary navigation">
+        <div className="app-brand">
+          <span className="app-brand-mark" aria-hidden="true">A</span>
+          <span className="eyebrow">AssetFlow</span>
         </div>
 
-        <div style={{ flex: 1, padding: "12px 0" }}>
-          {visibleItems.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              style={{
-                display: "block",
-                padding: "10px 20px",
-                color: window.location.pathname === item.to ? "#5AA7FF" : "#9EABB8",
-                textDecoration: "none",
-                fontSize: 14,
-                fontWeight: window.location.pathname === item.to ? 700 : 400,
-                background: window.location.pathname === item.to ? "#1E262F" : "transparent",
-              }}
-            >
-              {item.label}
-            </Link>
-          ))}
+        <div className="app-nav">
+          {visibleItems.map((item) => {
+            const active = window.location.pathname === item.to;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`app-nav-link${active ? " active" : ""}`}
+                aria-current={active ? "page" : undefined}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
         </div>
 
-        <div style={{ padding: "16px 20px", borderTop: "1px solid #33404D" }}>
-          <p style={{ fontSize: 13, color: "#9EABB8", margin: "0 0 4px" }}>{user.name}</p>
-          <p style={{ fontSize: 12, color: "#5AA7FF", margin: "0 0 12px", textTransform: "capitalize" }}>
-            {user.role.replace("_", " ")}
-          </p>
-          <button
-            onClick={logout}
-            style={{
-              background: "none",
-              border: "1px solid #33404D",
-              borderRadius: 7,
-              color: "#9EABB8",
-              padding: "6px 12px",
-              fontSize: 13,
-              cursor: "pointer",
-              width: "100%",
-            }}
-          >
-            Sign out
-          </button>
+        <div className="app-user">
+          <p className="app-user-name">{user.name}</p>
+          <p className="app-user-role">{user.role.replace("_", " ")}</p>
+          <button className="app-signout" onClick={logout}>Sign out</button>
         </div>
       </nav>
 
-      <div style={{ flex: 1, overflowY: "auto" }}>{children}</div>
+      <div className="app-content">{children}</div>
     </div>
   );
 }
