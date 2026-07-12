@@ -15,6 +15,13 @@ On a clean throwaway database, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f d
 After applying migration 005 and seeding, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_005_analytics_views.sql`; it validates view cardinality and seeded KPI/ghost/heatmap data, then rolls back.
 After applying migration 006, run `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f db/migrations/verify_006_exit_clearance.sql`; it validates direct-SQL blocking and successful deactivation after custody and booking blockers are resolved, then rolls back.
 
+For the complete clean proof, run `npm run db:verify:clean`. The harness creates a uniquely named local database, applies migrations `001` through `006`, runs the seed and `verify_003_constraints.sql`, resets the sequence consumed by that rollback-only verifier, runs the seed verifier and `verify_004` through `verify_006`, performs catalog and analytics assertions, starts the auth server for a four-role RBAC smoke, runs `verify_concurrency.mjs` with two PostgreSQL sessions, and drops the database in cleanup. The sequence reset is automated fixture cleanup; no manual database repair is required.
+
+The concurrency proof expects one committed writer and one blocked writer for each race:
+
+- Allocation race loser: SQLSTATE `23505`, `allocations_one_active_per_asset_idx`.
+- Booking race loser: SQLSTATE `23P01`, `bookings_no_active_overlap_excl`.
+
 Constraint handoff:
 
 - Active allocation conflicts use SQLSTATE `23505` and `allocations_one_active_per_asset_idx`.

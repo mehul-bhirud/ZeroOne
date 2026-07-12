@@ -8,6 +8,7 @@
     "dev:auth": "tsx auth/server.ts",
     "db:seed": "tsx db/seed/index.ts",
     "db:seed:verify": "tsx db/seed/verify.ts",
+    "db:verify:clean": "node db/migrations/verify_clean_database.mjs",
     "build": "tsc --noEmit && vite build --config frontend/vite.config.ts",
     "test": "vitest run --exclude auth/__tests__/integration.test.ts",
     "test:auth:integration": "vitest run auth/__tests__/integration.test.ts",
