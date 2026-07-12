@@ -54,6 +54,8 @@ export function createAuthApp(config: AuthConfig, repository: UserRepository): E
 
 export function createAuthAppFromDatabase(config: AuthConfig, databaseUrl = process.env.DATABASE_URL): { app: Express; pool: Pool } {
   if (!databaseUrl) throw new Error("DATABASE_URL is required to start the auth server.");
-  const pool = new Pool({ connectionString: databaseUrl });
+  const appRole = process.env.DATABASE_APP_ROLE;
+  if (appRole && !/^[a-z_][a-z0-9_]*$/.test(appRole)) throw new Error("DATABASE_APP_ROLE must be a simple PostgreSQL role name.");
+  const pool = new Pool({ connectionString: databaseUrl, options: appRole ? `-c role=${appRole}` : undefined });
   return { app: createAuthApp(config, new PgUserRepository(pool)), pool };
 }
