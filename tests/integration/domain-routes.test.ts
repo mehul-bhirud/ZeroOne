@@ -6,9 +6,10 @@ import request from "supertest";
 import { Pool } from "pg";
 import { createAuthAppFromDatabase } from "../../auth/app";
 import { loadAuthConfig } from "../../auth/config";
+import { hashPassword } from "../../auth/password";
 
 const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5432/postgres";
-const migrationFiles = ["001_extensions.sql", "002_schema_v0.sql", "003_canonical_constraints.sql"];
+const migrationFiles = ["001_extensions.sql", "002_schema_v0.sql", "003_canonical_constraints.sql", "004_activity_log_append_only.sql", "005_analytics_views.sql", "006_exit_clearance.sql"];
 let databaseName: string;
 let adminPool: Pool;
 let pool: Pool;
@@ -34,6 +35,10 @@ describe("domain HTTP routes", () => {
       INSERT INTO assets (id, name, category_id, serial_number, acquisition_date, condition, location, is_bookable)
       VALUES ($1, 'Route Test Asset', $2, 'ROUTE-TEST-1', CURRENT_DATE, 'good', 'HQ', true)
     `, [assetId, categoryId]);
+    await pool.query(
+      "INSERT INTO users (id, name, email, password_hash, role, status) VALUES ($1, 'Route Admin', 'route-admin@example.test', $2, 'admin', 'active')",
+      [randomUUID(), await hashPassword("correct horse battery staple")],
+    );
     const created = createAuthAppFromDatabase(loadAuthConfig({
       JWT_SECRET: "domain-route-test-secret-that-is-longer-than-32-characters",
       JWT_ISSUER: "assetflow",
@@ -95,5 +100,39 @@ describe("domain HTTP routes", () => {
       date_range_end: "2026-07-31",
     });
     expect(forbiddenAudit.status).toBe(403);
+  });
+
+  it("mounts allocation and reporting routes with the locked role and response guards", async () => {
+    const login = await request(app).post("/api/v1/auth/login").send({
+      email: "route-admin@example.test",
+      password: "correct horse battery staple",
+    });
+    expect(login.status).toBe(200);
+    const token = login.body.access_token as string;
+    const auth = { Authorization: `Bearer ${token}` };
+
+    for (const path of [
+      "/departments",
+      "/employees",
+      "/transfer-requests",
+      "/reports/utilization",
+      "/reports/maintenance-frequency",
+      "/reports/department-allocation-summary",
+      "/reports/booking-heatmap",
+      "/reports/ghost-risk",
+      "/dashboard/kpis",
+    ]) {
+      const response = await request(app).get(`/api/v1${path}`).set(auth);
+      expect(response.status, path).toBe(200);
+    }
+
+    const exportResponse = await request(app)
+      .get("/api/v1/reports/export?report=ghost-risk&format=csv")
+      .set(auth);
+    expect(exportResponse.status).toBe(200);
+    expect(exportResponse.headers["content-type"]).toContain("text/csv");
+
+    expect((await request(app).post("/api/v1/allocations").set(auth).send({})).status).toBe(400);
+    expect((await request(app).post("/api/v1/transfer-requests").set(auth).send({})).status).toBe(400);
   });
 });
