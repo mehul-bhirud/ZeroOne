@@ -33,14 +33,14 @@ interface KpiConfig {
 }
 
 const kpiCards: KpiConfig[] = [
-  { key: "available_assets",  label: "Available Assets",    icon: "✦",  tone: "positive", note: "Ready to allocate" },
-  { key: "allocated_assets",  label: "Allocated Assets",   icon: "⬡",  tone: "info",     note: "Currently in use" },
-  { key: "maintenance_today", label: "Maintenance Today",  icon: "⚙",  tone: "warning",  note: "Scheduled jobs" },
-  { key: "active_bookings",   label: "Active Bookings",    icon: "◈",  tone: "info",     note: "Live reservations" },
-  { key: "pending_transfers", label: "Pending Transfers",  icon: "⇄",  tone: "warning",  note: "Awaiting approval" },
-  { key: "upcoming_returns",  label: "Upcoming Returns",   icon: "↩",  tone: "neutral",  note: "Due within 7 days" },
-  { key: "overdue_returns",   label: "Overdue Returns",    icon: "⚠",  tone: "danger",   note: "Immediate action" },
-  { key: "ghost_risk",        label: "Ghost Risk",         icon: "◉",  tone: "danger",   note: "Unverified custody" },
+  { key: "available_assets",  label: "Available Assets",   icon: "✦", tone: "positive", note: "Ready to allocate" },
+  { key: "allocated_assets",  label: "Allocated Assets",   icon: "⬡", tone: "info",     note: "Currently in use" },
+  { key: "maintenance_today", label: "Maintenance Today",  icon: "⚙", tone: "warning",  note: "Scheduled jobs" },
+  { key: "active_bookings",   label: "Active Bookings",    icon: "◈", tone: "info",     note: "Live reservations" },
+  { key: "pending_transfers", label: "Pending Transfers",  icon: "⇄", tone: "warning",  note: "Awaiting approval" },
+  { key: "upcoming_returns",  label: "Upcoming Returns",   icon: "↩", tone: "neutral",  note: "Due within 7 days" },
+  { key: "overdue_returns",   label: "Overdue Returns",    icon: "⚠", tone: "danger",   note: "Immediate action" },
+  { key: "ghost_risk",        label: "Ghost Risk",         icon: "◉", tone: "danger",   note: "Unverified custody" },
 ];
 
 // Tone → CSS class mapping (uses Sarthak's status-chip tokens as surface colours)
@@ -257,6 +257,7 @@ export function DashboardScreen() {
         <div className="feature-nav">
           <FeatureNavigation role="employee" />
         </div>
+
         {/* ── Quick Actions ─────────────────────────────────────── */}
         <section className="quick-actions-section" aria-label="Quick actions">
           <h2 className="quick-actions-title">Quick Actions</h2>
