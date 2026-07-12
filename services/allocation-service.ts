@@ -83,7 +83,7 @@ export class AllocationService implements AllocationOperations {
   }
 
   async returnAsset(id: Identifier, input: JsonRecord): Promise<JsonRecord> {
-    const { return_condition_notes, action } = input;
+    const { return_condition_notes } = input;
     
     return await this.db.transaction(async (client) => {
       // Atomically return the allocation (prevents double-returns under concurrency)
