@@ -85,6 +85,26 @@ export async function createAsset(body: {
   return data.asset;
 }
 
+export async function getAssetById(id: string): Promise<{
+  asset: Asset;
+  allocations: any[];
+  transfer_requests: any[];
+  bookings: any[];
+  maintenance_requests: any[];
+  audit_findings: any[];
+  activity: any[];
+}> {
+  return apiFetch(`/assets/${id}`);
+}
+
+export async function updateAsset(id: string, body: { status: string }): Promise<Asset> {
+  const data = await apiFetch<{ asset: Asset }>(`/assets/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+  return data.asset;
+}
+
 // Re-export shared getters so we don't have to rewrite them here,
 // or we can just import them directly in the UI.
 export { getDepartments, getCategories } from "../org-setup/api";

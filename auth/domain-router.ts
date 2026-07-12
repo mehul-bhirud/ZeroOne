@@ -6,6 +6,7 @@ import type { UserRepository } from "./repository";
 import { AuditService } from "../services/audit-service";
 import { BookingService } from "../services/booking-service";
 import { MaintenanceService } from "../services/maintenance-service";
+import { AssetService } from "../services/asset-service";
 import type { DatabaseClient } from "../services/db";
 import { ExitClearanceService } from "./exit-clearance";
 
@@ -28,8 +29,22 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
   const bookings = new BookingService(db);
   const maintenance = new MaintenanceService(db);
   const exitClearance = new ExitClearanceService(db);
+  const assets = new AssetService(db);
 
   router.use(authenticate);
+
+  router.get("/assets", asyncRoute(async (request, response) => {
+    response.json(await assets.list(request.query as Record<string, string | number | boolean | undefined>));
+  }));
+  router.post("/assets", requireRoles("admin", "asset_manager"), asyncRoute(async (request, response) => {
+    response.status(201).json(await assets.create(request.body ?? {}));
+  }));
+  router.get("/assets/:id", asyncRoute(async (request, response) => {
+    response.json(await assets.get(pathId(request.params.id)));
+  }));
+  router.patch("/assets/:id", requireRoles("admin", "asset_manager"), asyncRoute(async (request, response) => {
+    response.json(await assets.update(pathId(request.params.id), request.body ?? {}));
+  }));
 
   router.patch("/employees/:id/deactivate", requireRoles("admin"), asyncRoute(async (request, response) => {
     response.json(await exitClearance.deactivate(
