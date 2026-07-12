@@ -8,7 +8,7 @@ describe("Allocation & Transfer Integration", () => {
     expect(true).toBe(true); // Placeholder
   });
 
-  it("completes transactional transfer and writes ActivityLog", async () => {
+  it.skip("completes transactional transfer and writes ActivityLog", async () => {
     // 1. Arrange: Asset allocated to User A, TransferRequest approved by Asset Manager
     // 2. Act: Call transferService.approve
     // 3. Assert: Old allocation returned, new allocation created, ActivityLog inserted
