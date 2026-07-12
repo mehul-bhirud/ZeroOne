@@ -27,11 +27,13 @@ async function apiFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const token = getToken();
-  const headers: Record<string, string> = {
+
+  const headers = new Headers({
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...((options.headers as Record<string, string>) ?? {}),
-  };
+  });
+
+  new Headers(options.headers).forEach((value, key) => headers.set(key, value));
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
