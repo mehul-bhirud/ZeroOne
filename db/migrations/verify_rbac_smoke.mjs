@@ -79,6 +79,44 @@ try {
     tokens.push([role, login.body.access_token]);
   }
 
+  const adminToken = tokens.find(([role]) => role === "admin")?.[1];
+  const employeeToken = tokens.find(([role]) => role === "employee")?.[1];
+  assert(adminToken && employeeToken, "RBAC smoke tokens were not created");
+  for (const route of [
+    "/departments",
+    "/employees",
+    "/transfer-requests",
+    "/reports/utilization",
+    "/reports/maintenance-frequency",
+    "/reports/department-allocation-summary",
+    "/reports/booking-heatmap",
+    "/reports/ghost-risk",
+    "/dashboard/kpis",
+  ]) {
+    const response = await fetch(`${baseUrl}${route}`, { headers: { authorization: `Bearer ${adminToken}` } });
+    assert(response.status === 200, `${route} returned ${response.status}`);
+  }
+  const exportResponse = await fetch(`${baseUrl}/reports/export?report=ghost-risk&format=csv`, { headers: { authorization: `Bearer ${adminToken}` } });
+  assert(exportResponse.status === 200 && (exportResponse.headers.get("content-type") ?? "").includes("text/csv"), "reports export route did not return CSV");
+  const allocationProbe = await requestJson(`${baseUrl}/allocations`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
+    body: "{}",
+  });
+  assert(allocationProbe.response.status === 400, `allocation route validation returned ${allocationProbe.response.status}`);
+  const transferProbe = await requestJson(`${baseUrl}/transfer-requests`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${adminToken}`, "content-type": "application/json" },
+    body: "{}",
+  });
+  assert(transferProbe.response.status === 400, `transfer route validation returned ${transferProbe.response.status}`);
+  const employeeAllocation = await requestJson(`${baseUrl}/allocations`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${employeeToken}`, "content-type": "application/json" },
+    body: "{}",
+  });
+  assert(employeeAllocation.response.status === 403, `employee allocation guard returned ${employeeAllocation.response.status}`);
+
   for (const [role, token] of tokens) {
     const cycle = await requestJson(`${baseUrl}/audit-cycles`, {
       method: "POST",

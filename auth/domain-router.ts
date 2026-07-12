@@ -1,13 +1,14 @@
 import { Router, type RequestHandler } from "express";
 import type { AuthConfig } from "./config";
 import { authenticateBearer } from "./middleware";
-import { requireRoles } from "./rbac";
+import { effectiveDepartmentScope, requireRoles } from "./rbac";
 import type { UserRepository } from "./repository";
 import { AuditService } from "../services/audit-service";
 import { BookingService } from "../services/booking-service";
 import { MaintenanceService } from "../services/maintenance-service";
 import { AssetService } from "../services/asset-service";
 import { AllocationService } from "../services/allocation-service";
+import { TransferService } from "../services/transfer-service";
 import type { DatabaseClient } from "../services/db";
 import { ExitClearanceService } from "./exit-clearance";
 import { AuthorizationError, ValidationError } from "../domain/errors";
@@ -17,11 +18,149 @@ function asyncRoute(handler: RequestHandler): RequestHandler {
 }
 
 function currentUser(response: Parameters<RequestHandler>[1]) {
-  return response.locals.auth.user as { id: string; role: string };
+  return response.locals.auth.user as { id: string; role: string; department_id?: string };
 }
 
 function pathId(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function queryValue(request: Parameters<RequestHandler>[0], key: string): string | undefined {
+  const value = request.query[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function addFilter(where: string[], params: unknown[], expression: string, value: unknown): void {
+  if (typeof value === "string" && value.trim()) {
+    params.push(value.trim());
+    where.push(expression.replace("?", `$${params.length}`));
+  }
+}
+
+function csvValue(value: unknown): string {
+  const text = value === null || value === undefined ? "" : String(value);
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function csv(rows: Record<string, unknown>[]): string {
+  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  return [keys.join(","), ...rows.map((row) => keys.map((key) => csvValue(row[key])).join(","))].join("\n");
+}
+
+async function reportRows(
+  db: DatabaseClient,
+  report: string,
+  request: Parameters<RequestHandler>[0],
+  user: { id: string; role: string; department_id?: string },
+): Promise<Record<string, unknown>[]> {
+  const params: unknown[] = [];
+  const where: string[] = [];
+  const requestedDepartment = queryValue(request, "department") ?? queryValue(request, "department_id");
+  const scopedDepartment = user.role === "department_head"
+    ? effectiveDepartmentScope({ user } as never, requestedDepartment)
+    : requestedDepartment;
+  const location = queryValue(request, "location");
+  const category = queryValue(request, "category") ?? queryValue(request, "category_id");
+  const status = queryValue(request, "status");
+
+  if (report === "utilization") {
+    addFilter(where, params, "u.department_id::text = ?", scopedDepartment);
+    addFilter(where, params, "u.location = ?", location);
+    addFilter(where, params, "c.id::text = ?", category);
+    addFilter(where, params, "u.status = ?", status);
+    const result = await db.query<Record<string, unknown>>(`
+      SELECT u.asset_id, u.asset_tag, u.asset_name AS name, c.name AS category,
+             u.location, u.status, u.is_bookable, u.booking_count, u.booked_minutes,
+             CASE WHEN u.is_bookable THEN ROUND(LEAST(100, (u.booked_minutes::numeric / 1440) * 100), 2) ELSE 0 END AS utilization_pct
+      FROM v_utilization u
+      JOIN asset_categories c ON c.id = u.category_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY u.asset_tag
+    `, params);
+    return result.rows;
+  }
+
+  if (report === "maintenance-frequency") {
+    addFilter(where, params, "m.department_id::text = ?", scopedDepartment);
+    addFilter(where, params, "m.location = ?", location);
+    addFilter(where, params, "c.id::text = ?", category);
+    const result = await db.query<Record<string, unknown>>(`
+      SELECT m.asset_id, m.asset_tag, m.asset_name AS name, c.name AS category,
+             m.location, m.request_count AS incident_count, m.resolved_count,
+             m.open_count, m.high_priority_count, 0::numeric AS avg_downtime_days
+      FROM v_maintenance_frequency m
+      JOIN asset_categories c ON c.id = m.category_id
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY m.asset_tag
+    `, params);
+    return result.rows;
+  }
+
+  if (report === "department-allocation-summary") {
+    addFilter(where, params, "s.department_id::text = ?", scopedDepartment);
+    const result = await db.query<Record<string, unknown>>(`
+      SELECT s.department_id, s.department_name AS department,
+             s.allocated_asset_count AS allocated_assets,
+             s.allocated_asset_count + available.available_assets AS total_assets,
+             available.available_assets,
+             s.active_allocation_count, s.overdue_return_count, s.allocated_acquisition_value
+      FROM v_department_allocation_summary s
+      CROSS JOIN (SELECT COUNT(*)::integer AS available_assets FROM assets WHERE status = 'available') available
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY s.department_name
+    `, params);
+    return result.rows;
+  }
+
+  if (report === "booking-heatmap") {
+    addFilter(where, params, "a.location = ?", location);
+    addFilter(where, params, "a.category_id::text = ?", category);
+    addFilter(where, params, "b.asset_id::text = ?", queryValue(request, "asset_id"));
+    addFilter(where, params, "b.status = ?", status);
+    const result = await db.query<Record<string, unknown>>(`
+      SELECT (EXTRACT(isodow FROM slot.hour_start)::integer % 7) AS day_of_week,
+             EXTRACT(hour FROM slot.hour_start)::integer AS hour,
+             COUNT(*)::integer AS booking_count,
+             SUM(EXTRACT(epoch FROM (
+               LEAST(b.end_time, (slot.hour_start + interval '1 hour') AT TIME ZONE 'UTC')
+               - GREATEST(b.start_time, slot.hour_start AT TIME ZONE 'UTC')
+             )) / 60)::bigint AS booked_minutes
+      FROM bookings b
+      JOIN assets a ON a.id = b.asset_id
+      CROSS JOIN LATERAL generate_series(
+        date_trunc('hour', b.start_time AT TIME ZONE 'UTC'),
+        date_trunc('hour', (b.end_time - interval '1 microsecond') AT TIME ZONE 'UTC'),
+        interval '1 hour'
+      ) AS slot(hour_start)
+      WHERE b.status NOT IN ('cancelled', 'no_show')
+        ${where.length ? `AND ${where.join(" AND ")}` : ""}
+      GROUP BY EXTRACT(isodow FROM slot.hour_start), EXTRACT(hour FROM slot.hour_start)
+      ORDER BY day_of_week, hour
+    `, params);
+    return result.rows;
+  }
+
+  if (report === "ghost-risk") {
+    addFilter(where, params, "g.department_id::text = ?", scopedDepartment);
+    addFilter(where, params, "g.location = ?", location);
+    addFilter(where, params, "g.category_id::text = ?", category);
+    const threshold = queryValue(request, "threshold_days");
+    if (threshold && (!/^\d+$/.test(threshold) || Number(threshold) < 1 || Number(threshold) > 3650)) {
+      throw new ValidationError("threshold_days must be an integer from 1 to 3650");
+    }
+    if (threshold) addFilter(where, params, "g.days_since_verified >= ?", threshold);
+    const result = await db.query<Record<string, unknown>>(`
+      SELECT g.asset_id AS id, g.asset_tag, g.asset_name AS name, g.category_name AS category,
+             g.serial_number, g.status, g.location, g.acquisition_cost,
+             g.last_verified_at, g.days_since_verified
+      FROM v_ghost_risk g
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY g.days_since_verified DESC NULLS FIRST, g.asset_tag
+    `, params);
+    return result.rows;
+  }
+
+  throw new ValidationError("Unsupported report. Choose utilization, maintenance-frequency, department-allocation-summary, booking-heatmap, or ghost-risk.");
 }
 
 export function createDomainRouter(config: AuthConfig, repository: UserRepository, db: DatabaseClient): Router {
@@ -33,6 +172,7 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
   const exitClearance = new ExitClearanceService(db);
   const assets = new AssetService(db);
   const allocations = new AllocationService(db);
+  const transfers = new TransferService(db);
 
   router.use(authenticate);
 
@@ -48,6 +188,73 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
   router.patch("/assets/:id", requireRoles("admin", "asset_manager"), asyncRoute(async (request, response) => {
     response.json(await assets.update(pathId(request.params.id), request.body ?? {}));
   }));
+
+  router.get("/departments", requireRoles("admin", "asset_manager", "department_head"), asyncRoute(async (_request, response) => {
+    const { rows } = await db.query(`
+      SELECT id, name, parent_department_id, head_user_id, status
+      FROM departments
+      ORDER BY name
+    `);
+    response.json({ departments: rows });
+  }));
+
+  router.get("/employees", requireRoles("admin", "asset_manager", "department_head"), asyncRoute(async (request, response) => {
+    const user = currentUser(response);
+    const params: unknown[] = [];
+    const where: string[] = [];
+    const requestedDepartment = queryValue(request, "department") ?? queryValue(request, "department_id");
+    const department = user.role === "department_head"
+      ? effectiveDepartmentScope({ user } as never, requestedDepartment)
+      : requestedDepartment;
+    addFilter(where, params, "u.department_id::text = ?", department);
+    addFilter(where, params, "u.role = ?", queryValue(request, "role"));
+    addFilter(where, params, "u.status = ?", queryValue(request, "status"));
+    const search = queryValue(request, "search");
+    if (search) {
+      params.push(`%${search}%`);
+      where.push(`(u.name ILIKE $${params.length} OR u.email ILIKE $${params.length})`);
+    }
+    const { rows } = await db.query(`
+      SELECT u.id, u.name, u.email, u.role, u.department_id, u.status
+      FROM users u
+      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+      ORDER BY u.name
+    `, params);
+    response.json({ employees: rows });
+  }));
+
+  router.post("/allocations", requireRoles("admin", "asset_manager"), asyncRoute(async (request, response) => {
+    response.status(201).json(await allocations.create({ ...request.body, actor_id: currentUser(response).id }));
+  }));
+
+  router.post("/transfer-requests", requireRoles("admin", "asset_manager", "employee"), asyncRoute(async (request, response) => {
+    response.status(201).json(await transfers.create({ ...request.body, requested_by: currentUser(response).id }));
+  }));
+
+  router.get("/transfer-requests", requireRoles("admin", "asset_manager"), asyncRoute(async (_request, response) => {
+    const { rows } = await db.query(`
+      SELECT t.id, t.asset_id, a.asset_tag, t.from_holder, t.to_holder, t.status,
+             t.requested_by, t.approved_by,
+             requester.name AS requested_by_name, approver.name AS approved_by_name
+      FROM transfer_requests t
+      JOIN assets a ON a.id = t.asset_id
+      LEFT JOIN users requester ON requester.id = t.requested_by
+      LEFT JOIN users approver ON approver.id = t.approved_by
+      ORDER BY t.id DESC
+    `);
+    response.json({ transfer_requests: rows });
+  }));
+
+  const approveTransfer = asyncRoute(async (request, response) => {
+    response.json(await transfers.approve(pathId(request.params.id), { ...request.body, approved_by: currentUser(response).id }));
+  });
+  const rejectTransfer = asyncRoute(async (request, response) => {
+    response.json(await transfers.reject(pathId(request.params.id), { ...request.body, rejected_by: currentUser(response).id }));
+  });
+  router.patch("/transfer-requests/:id/approve", requireRoles("admin", "asset_manager"), approveTransfer);
+  router.post("/transfer-requests/:id/approve", requireRoles("admin", "asset_manager"), approveTransfer);
+  router.patch("/transfer-requests/:id/reject", requireRoles("admin", "asset_manager"), rejectTransfer);
+  router.post("/transfer-requests/:id/reject", requireRoles("admin", "asset_manager"), rejectTransfer);
 
   router.patch("/employees/:id/deactivate", requireRoles("admin"), asyncRoute(async (request, response) => {
     response.json(await exitClearance.deactivate(
@@ -83,6 +290,40 @@ export function createDomainRouter(config: AuthConfig, repository: UserRepositor
   }));
   router.post("/bookings/:id/checkin", asyncRoute(async (request, response) => {
     response.json(await bookings.checkin(pathId(request.params.id), request.body ?? {}));
+  }));
+
+  const reportRoles = requireRoles("admin", "asset_manager", "department_head");
+  const reportEndpoint = (report: string): RequestHandler => asyncRoute(async (request, response) => {
+    const rows = await reportRows(db, report, request, currentUser(response));
+    if (report === "ghost-risk") {
+      const acquisitionValue = rows.reduce((total, row) => total + Number(row.acquisition_cost ?? 0), 0);
+      response.json({ assets: rows, count: rows.length, acquisition_value: acquisitionValue, threshold_days: Number(queryValue(request, "threshold_days") ?? 90) });
+      return;
+    }
+    if (report === "booking-heatmap") {
+      response.json({ cells: rows, summary: { occupied_cells: rows.length, booking_count: rows.reduce((total, row) => total + Number(row.booking_count ?? 0), 0) } });
+      return;
+    }
+    response.json({ rows, summary: { count: rows.length } });
+  });
+  router.get("/reports/utilization", reportRoles, reportEndpoint("utilization"));
+  router.get("/reports/maintenance-frequency", reportRoles, reportEndpoint("maintenance-frequency"));
+  router.get("/reports/department-allocation-summary", reportRoles, reportEndpoint("department-allocation-summary"));
+  router.get("/reports/booking-heatmap", reportRoles, reportEndpoint("booking-heatmap"));
+  router.get("/reports/ghost-risk", reportRoles, reportEndpoint("ghost-risk"));
+  router.get("/reports/export", reportRoles, asyncRoute(async (request, response) => {
+    if (queryValue(request, "format") !== "csv") throw new ValidationError("format must be csv");
+    const report = queryValue(request, "report");
+    if (!report || !["utilization", "maintenance-frequency", "department-allocation-summary", "booking-heatmap", "ghost-risk"].includes(report)) {
+      throw new ValidationError("report must name a supported report");
+    }
+    const rows = await reportRows(db, report, request, currentUser(response));
+    response.type("text/csv").set("Content-Disposition", `attachment; filename=report-${report}.csv`).send(csv(rows));
+  }));
+
+  router.get("/dashboard/kpis", reportRoles, asyncRoute(async (_request, response) => {
+    const { rows } = await db.query("SELECT * FROM v_dashboard_kpis LIMIT 1");
+    response.json(rows[0] ?? {});
   }));
 
   router.get("/notifications", asyncRoute(async (request, response) => {
