@@ -259,7 +259,7 @@ export function DashboardScreen() {
         </div>
         {/* ── Quick Actions ─────────────────────────────────────── */}
         <section className="quick-actions-section" aria-label="Quick actions">
-          <p className="quick-actions-title">Quick Actions</p>
+          <h2 className="quick-actions-title">Quick Actions</h2>
           <div className="quick-actions-row">
             <button
               id="qa-register-asset"
