@@ -27,7 +27,7 @@ button, input { font: inherit; }
 .auth-card { max-width: 440px; }
 .input:focus { outline: none; border-color: #5AA7FF; box-shadow: 0 0 0 2px rgba(90,167,255,.18); }
 .input::placeholder { color: #5A6A78; }
-.button:hover:not(:disabled) { background: #7DBBFF; }
+.button:not(.button--outline):not(.button--danger):hover:not(:disabled) { background: #7DBBFF; }
 .button--outline { background: transparent; border: 1px solid #33404D; color: #F3F6F8; }
 .button--outline:hover:not(:disabled) { border-color: #5AA7FF; color: #5AA7FF; }
 .button--danger { background: #F87171; color: #07111B; }
