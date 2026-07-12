@@ -1,7 +1,7 @@
 import { AssetOperations, Identifier, JsonRecord, Query } from "./contracts";
 import { DatabaseClient } from "./db";
 import { assetStateMachine, AssetState } from "../domain/workflows";
-import { ValidationError, TransitionError } from "../domain/errors";
+import { ValidationError, TransitionError, BusinessConflictError } from "../domain/errors";
 
 export class AssetService implements AssetOperations {
   constructor(private db: DatabaseClient) {}
@@ -72,6 +72,9 @@ export class AssetService implements AssetOperations {
     const currentStatus = currentRows[0].status as AssetState;
     
     if (input.status && input.status !== currentStatus) {
+      if (input.status === 'under_maintenance') {
+        throw new BusinessConflictError("INVALID_TRANSITION", "Asset cannot be placed directly into maintenance. Use the maintenance approval workflow.");
+      }
       // Validate transition via state machine
       assetStateMachine.transition(currentStatus, input.status as AssetState);
     }
