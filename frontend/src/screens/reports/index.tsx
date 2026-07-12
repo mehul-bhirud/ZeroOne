@@ -123,7 +123,7 @@ export function ReportsScreen() {
         method: "POST",
         body: JSON.stringify(payload)
       });
-      navigate(`/audit`);
+      navigate("/audits");
     } catch (err: any) {
       setError(err?.message || "Failed to create audit cycle");
     } finally {

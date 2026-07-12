@@ -1,31 +1,36 @@
 ﻿import { useNavigate } from "react-router-dom";
-import { Button, ScreenShell, StatusChip } from "../../design-system";
+import { useEffect, useState } from "react";
+import { Button, ErrorSummary, ScreenShell, Skeleton, StatusChip } from "../../design-system";
+import { getToken } from "../../auth/api";
+import { useAuth } from "../../auth/AuthContext";
 import { FeatureNavigation } from "./FeatureNavigation";
 
-// ── Mock KPI data ─────────────────────────────────────────────────────────────
-const kpi = {
-  available_assets: 142,
-  allocated_assets: 318,
-  maintenance_today: 7,
-  active_bookings: 24,
-  pending_transfers: 11,
-  upcoming_returns: 19,
-  overdue_returns: 5,
-  ghost_risk: 3,
+// ── Database-backed KPI data ─────────────────────────────────────────────────
+type Kpi = {
+  available_assets: number;
+  allocated_assets: number;
+  maintenance_today: number;
+  active_bookings: number;
+  pending_transfers: number;
+  upcoming_returns: number;
+  overdue_returns: number;
+  ghost_risk: number;
 };
 
-// ── Mock overdue-return rows ──────────────────────────────────────────────────
-const overdueRows = [
-  { id: "OD-001", asset: "MacBook Pro 16\u2033 \u2014 SN#MB2341", assignee: "Priya Nair", dept: "Engineering", daysOverdue: 14 },
-  { id: "OD-002", asset: "Canon EOS R5 \u2014 SN#CA9921", assignee: "Rahul Mehta", dept: "Marketing", daysOverdue: 9 },
-  { id: "OD-003", asset: "Bosch SHR Drill \u2014 SN#BK0032", assignee: "Ankit Joshi", dept: "Facilities", daysOverdue: 6 },
-  { id: "OD-004", asset: "iPad Air 5 \u2014 SN#IP7712", assignee: "Sneha Iyer", dept: "HR", daysOverdue: 3 },
-  { id: "OD-005", asset: "Dell Monitor 27\u2033 \u2014 SN#DL4458", assignee: "Karan Singh", dept: "Finance", daysOverdue: 1 },
-];
+const emptyKpi: Kpi = {
+  available_assets: 0,
+  allocated_assets: 0,
+  maintenance_today: 0,
+  active_bookings: 0,
+  pending_transfers: 0,
+  upcoming_returns: 0,
+  overdue_returns: 0,
+  ghost_risk: 0,
+};
 
 // ── KPI card config ───────────────────────────────────────────────────────────
 interface KpiConfig {
-  key: keyof typeof kpi;
+  key: keyof Kpi;
   label: string;
   icon: string;
   tone: "positive" | "info" | "warning" | "danger" | "neutral";
@@ -55,6 +60,27 @@ const tonePanel: Record<KpiConfig["tone"], string> = {
 // ── Component ─────────────────────────────────────────────────────────────────
 export function DashboardScreen() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [kpi, setKpi] = useState<Kpi>(emptyKpi);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const token = getToken();
+    fetch("/api/v1/dashboard/kpis", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const body = await response.json().catch(() => null);
+          throw new Error(body?.error?.message ?? "Unable to load dashboard KPIs.");
+        }
+        return response.json() as Promise<Kpi>;
+      })
+      .then(setKpi)
+      .catch((cause: Error) => setError(cause.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <>
@@ -255,8 +281,11 @@ export function DashboardScreen() {
       >
         {/* Feature nav */}
         <div className="feature-nav">
-          <FeatureNavigation role="employee" />
+          <FeatureNavigation role={user?.role ?? "employee"} />
         </div>
+
+        {error && <ErrorSummary message={error} />}
+        {loading && <Skeleton lines={4} />}
 
         {/* ── Quick Actions ─────────────────────────────────────── */}
         <section className="quick-actions-section" aria-label="Quick actions">
@@ -329,45 +358,9 @@ export function DashboardScreen() {
             </Button>
           </div>
 
-          <table className="overdue-table">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Assignee</th>
-                <th>Department</th>
-                <th>Days Overdue</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overdueRows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <div className="asset-name">{row.asset}</div>
-                    <div className="asset-id">{row.id}</div>
-                  </td>
-                  <td style={{ color: "#F3F6F8" }}>{row.assignee}</td>
-                  <td style={{ color: "#9EABB8" }}>{row.dept}</td>
-                  <td>
-                    <span
-                      className={`days-pill ${
-                        row.daysOverdue >= 10
-                          ? "days-pill--critical"
-                          : row.daysOverdue >= 4
-                          ? "days-pill--warn"
-                          : "days-pill--mild"
-                      }`}
-                    >
-                      {row.daysOverdue}d overdue
-                    </span>
-                  </td>
-                  <td>
-                    <StatusChip status="Rejected" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <p style={{ color: "#C6D0D8", margin: 0 }}>
+            Open Allocation Action to review the current custody records and complete returns.
+          </p>
         </section>
       </ScreenShell>
     </>

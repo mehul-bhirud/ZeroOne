@@ -113,6 +113,7 @@ describe("domain HTTP routes", () => {
 
     for (const path of [
       "/departments",
+      "/categories",
       "/employees",
       "/transfer-requests",
       "/reports/utilization",
@@ -125,6 +126,42 @@ describe("domain HTTP routes", () => {
       const response = await request(app).get(`/api/v1${path}`).set(auth);
       expect(response.status, path).toBe(200);
     }
+
+    const createdDepartment = await request(app)
+      .post("/api/v1/departments")
+      .set(auth)
+      .send({ name: "Integration Department", status: "active" });
+    expect(createdDepartment.status).toBe(201);
+    expect(createdDepartment.body.department).toMatchObject({ name: "Integration Department", status: "active" });
+
+    const updatedDepartment = await request(app)
+      .patch("/api/v1/departments")
+      .set(auth)
+      .send({ id: createdDepartment.body.department.id, name: "Integrated Department" });
+    expect(updatedDepartment.status).toBe(200);
+    expect(updatedDepartment.body.department.name).toBe("Integrated Department");
+
+    const createdCategory = await request(app)
+      .post("/api/v1/categories")
+      .set(auth)
+      .send({ name: "Integration Category", custom_fields: { warranty: "date" } });
+    expect(createdCategory.status).toBe(201);
+    expect(createdCategory.body.category.custom_fields).toEqual({ warranty: "date" });
+
+    const updatedCategory = await request(app)
+      .patch("/api/v1/categories")
+      .set(auth)
+      .send({ id: createdCategory.body.category.id, custom_fields: { owner: "text" } });
+    expect(updatedCategory.status).toBe(200);
+    expect(updatedCategory.body.category.custom_fields).toEqual({ owner: "text" });
+
+    const employee = await pool.query<{ id: string }>("SELECT id FROM users WHERE email = 'route-user@example.test'");
+    const updatedEmployee = await request(app)
+      .patch(`/api/v1/employees/${employee.rows[0].id}`)
+      .set(auth)
+      .send({ role: "department_head", department_id: createdDepartment.body.department.id });
+    expect(updatedEmployee.status).toBe(200);
+    expect(updatedEmployee.body.employee).toMatchObject({ role: "department_head", department_id: createdDepartment.body.department.id });
 
     const exportResponse = await request(app)
       .get("/api/v1/reports/export?report=ghost-risk&format=csv")
