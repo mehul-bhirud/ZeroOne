@@ -24,6 +24,8 @@ import {
 
 /* ══════════════════════ Org Setup Shell ══════════════════════ */
 
+import { useNavigate } from "react-router-dom";
+
 export function OrgSetupScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"departments" | "categories" | "employees">("departments");
@@ -58,12 +60,7 @@ export function OrgSetupScreen() {
 
       {activeTab === "departments" && <DepartmentsTab />}
       {activeTab === "categories" && <CategoriesTab />}
-      {activeTab === "employees" && (
-        <EmptyState
-          title="Employee Directory is available in the next update."
-          action={<span className="badge">Coming soon</span>}
-        />
-      )}
+      {activeTab === "employees" && <EmployeesTab />}
     </ScreenShell>
   );
 }
@@ -627,6 +624,333 @@ function CategoryFormModal({
           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
             <Button id="cat-save" type="submit" disabled={pending}>
               {pending ? "Saving…" : existing ? "Save changes" : "Create"}
+            </Button>
+            <button type="button" className="button button--outline" onClick={onClose} disabled={pending}>
+              Cancel
+            </button>
+          </div>
+        </Modal>
+      </form>
+    </div>
+  );
+}
+
+/* ══════════════════════ Employees Tab ══════════════════════ */
+
+import { getEmployees, updateEmployee, deactivateEmployee, type Employee } from "./api";
+
+function EmployeesTab() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+
+  const [search, setSearch] = useState("");
+  const [filterRole, setFilterRole] = useState("");
+  const [filterDept, setFilterDept] = useState("");
+  const [filterStatus, setFilterStatus] = useState("active");
+
+  const [editRoleEmp, setEditRoleEmp] = useState<Employee | null>(null);
+  const [deactivateEmp, setDeactivateEmp] = useState<Employee | null>(null);
+
+  useEffect(() => {
+    // Load departments for the filter dropdown
+    getDepartments().then(setDepartments).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterRole, filterDept, filterStatus]);
+
+  async function loadEmployees() {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await getEmployees({
+        search,
+        role: filterRole || undefined,
+        department: filterDept || undefined,
+        status: filterStatus || undefined,
+      });
+      setEmployees(data);
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || "Unable to load employees.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent) {
+    if (e.key === "Enter") {
+      loadEmployees();
+    }
+  }
+
+  function showToastMsg(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(""), 3000);
+  }
+
+  return (
+    <div className="fade-in">
+      {error && <ErrorSummary message={error} />}
+
+      <div className="search-bar" style={{ flexWrap: "wrap" }}>
+        <Input
+          placeholder="Search by name or email (press Enter)"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={handleSearchKeyDown}
+          style={{ width: 280 }}
+        />
+        
+        <select className="input" style={{ width: 160 }} value={filterRole} onChange={(e) => setFilterRole(e.target.value)}>
+          <option value="">All roles</option>
+          <option value="admin">Admin</option>
+          <option value="asset_manager">Asset Manager</option>
+          <option value="department_head">Department Head</option>
+          <option value="employee">Employee</option>
+        </select>
+
+        <select className="input" style={{ width: 180 }} value={filterDept} onChange={(e) => setFilterDept(e.target.value)}>
+          <option value="">All departments</option>
+          {departments.map(d => (
+            <option key={d.id} value={d.id}>{d.name}</option>
+          ))}
+        </select>
+
+        <select className="input" style={{ width: 140 }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+
+        <Button onClick={loadEmployees}>Filter</Button>
+      </div>
+
+      {loading ? (
+        <Skeleton lines={6} />
+      ) : employees.length === 0 ? (
+        <EmptyState title="No employees found matching the filters." action={<span />} />
+      ) : (
+        <div className="panel">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name & Email</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th style={{ width: 180 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp) => (
+                <tr key={emp.id}>
+                  <td>
+                    <div style={{ fontWeight: 600 }}>{emp.name}</div>
+                    <div style={{ fontSize: 12, color: "#9EABB8" }}>{emp.email}</div>
+                  </td>
+                  <td style={{ textTransform: "capitalize" }}>{emp.role.replace("_", " ")}</td>
+                  <td style={{ color: "#9EABB8" }}>
+                    {departments.find((d) => d.id === emp.department_id)?.name || "—"}
+                  </td>
+                  <td>
+                    <span className={`badge`} style={{
+                      background: emp.status === "active" ? "#173C2D" : "#4B2227",
+                      color: emp.status === "active" ? "#7DE2AE" : "#FF9AA5",
+                    }}>
+                      {emp.status}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        className="button button--outline button--sm"
+                        onClick={() => setEditRoleEmp(emp)}
+                      >
+                        Change role
+                      </button>
+                      {emp.status === "active" && (
+                        <button
+                          className="button button--danger button--sm"
+                          onClick={() => setDeactivateEmp(emp)}
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editRoleEmp && (
+        <RoleAssignmentModal
+          employee={editRoleEmp}
+          onClose={() => setEditRoleEmp(null)}
+          onSaved={() => {
+            setEditRoleEmp(null);
+            loadEmployees();
+            showToastMsg("Employee role updated successfully.");
+          }}
+        />
+      )}
+
+      {deactivateEmp && (
+        <DeactivateModal
+          employee={deactivateEmp}
+          onClose={() => setDeactivateEmp(null)}
+          onSaved={() => {
+            setDeactivateEmp(null);
+            loadEmployees();
+            showToastMsg("Employee deactivated successfully.");
+          }}
+        />
+      )}
+
+      {toast && <Toast message={toast} />}
+    </div>
+  );
+}
+
+function RoleAssignmentModal({
+  employee,
+  onClose,
+  onSaved,
+}: {
+  employee: Employee;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [role, setRole] = useState(employee.role);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (role === employee.role) {
+      onClose();
+      return;
+    }
+    
+    setPending(true);
+    try {
+      await updateEmployee(employee.id, { role });
+      onSaved();
+    } catch (err: unknown) {
+      setError((err as { message?: string })?.message || "Unable to update role.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+    }}>
+      <form onSubmit={handleSubmit} style={{ width: 400 }}>
+        <Modal title={`Assign Role: ${employee.name}`}>
+          {error && <ErrorSummary message={error} />}
+
+          <p style={{ fontSize: 14, color: "#9EABB8", marginBottom: 16 }}>
+            Admin access is required to change roles. Be careful when granting administrative privileges.
+          </p>
+
+          <FormField label="Role">
+            <select
+              className="input"
+              value={role}
+              onChange={(e) => setRole(e.target.value as Employee["role"])}
+              disabled={pending}
+            >
+              <option value="employee">Employee</option>
+              <option value="department_head">Department Head</option>
+              <option value="asset_manager">Asset Manager</option>
+              <option value="admin">Admin</option>
+            </select>
+          </FormField>
+
+          <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving…" : "Save role"}
+            </Button>
+            <button type="button" className="button button--outline" onClick={onClose} disabled={pending}>
+              Cancel
+            </button>
+          </div>
+        </Modal>
+      </form>
+    </div>
+  );
+}
+
+function DeactivateModal({
+  employee,
+  onClose,
+  onSaved,
+}: {
+  employee: Employee;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    
+    setPending(true);
+    try {
+      await deactivateEmployee(employee.id, reason.trim() || undefined);
+      onSaved();
+    } catch (err: any) {
+      if (err?.code === "EXIT_CLEARANCE_REQUIRED") {
+        // Route directly to Exit Clearance screen with context
+        navigate(`/exit-clearance?employee_id=${employee.id}`);
+      } else {
+        setError(err?.message || "Unable to deactivate employee.");
+      }
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.6)",
+      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100,
+    }}>
+      <form onSubmit={handleSubmit} style={{ width: 440 }}>
+        <Modal title={`Deactivate ${employee.name}`}>
+          {error && <ErrorSummary message={error} />}
+
+          <p style={{ fontSize: 14, color: "#FF9AA5", marginBottom: 16, background: "#4B2227", padding: "10px 12px", borderRadius: 6 }}>
+            Deactivating an employee revokes their access immediately. If they have active asset allocations, you must complete exit clearance first.
+          </p>
+
+          <FormField label="Reason (Optional)">
+            <Input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="e.g. Resigned, Contract ended"
+              disabled={pending}
+            />
+          </FormField>
+
+          <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+            <Button type="submit" disabled={pending} className="button button--danger">
+              {pending ? "Deactivating…" : "Deactivate employee"}
             </Button>
             <button type="button" className="button button--outline" onClick={onClose} disabled={pending}>
               Cancel
