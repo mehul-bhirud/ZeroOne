@@ -98,7 +98,9 @@ export function DashboardScreen() {
         .kpi-card {
           border: 1px solid #33404D;
           border-radius: 14px;
-          background: #141A21;
+          background: linear-gradient(135deg, rgba(27, 49, 74, .72), rgba(12, 27, 43, .62));
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           padding: 22px 20px 18px;
           display: flex;
           flex-direction: column;
@@ -151,7 +153,9 @@ export function DashboardScreen() {
         .overdue-section {
           border: 1px solid #4B2227;
           border-radius: 14px;
-          background: #1A1116;
+          background: linear-gradient(135deg, rgba(67, 27, 42, .58), rgba(29, 18, 28, .56));
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           padding: 24px;
           margin-bottom: 32px;
         }
@@ -264,7 +268,7 @@ export function DashboardScreen() {
           display: inline-block;
           padding: 7px 16px;
           border-radius: 8px;
-          background: #1E262F;
+          background: rgba(126, 190, 255, .09);
           color: #9EABB8;
           font-size: 13px;
           font-weight: 600;
@@ -272,7 +276,7 @@ export function DashboardScreen() {
           border: 1px solid #33404D;
           transition: background .15s, color .15s;
         }
-        .feature-nav a:hover { background: #29323B; color: #F3F6F8; }
+        .feature-nav a:hover { background: rgba(126, 190, 255, .17); color: #F3F6F8; }
       `}</style>
 
       <ScreenShell

@@ -213,7 +213,7 @@ export function ReportsScreen() {
         .report-table tr:hover td { background: rgba(255,255,255,0.02); }
 
         .metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-        .metric-card { background: #141A21; border: 1px solid #33404D; padding: 20px; border-radius: 12px; }
+        .metric-card { background: linear-gradient(135deg, rgba(27, 49, 74, .72), rgba(12, 27, 43, .62)); border: 1px solid rgba(174, 213, 255, .18); padding: 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
         .metric-val { font-size: 32px; font-weight: 800; color: #F3F6F8; margin-top: 8px; }
       `}</style>
 

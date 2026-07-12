@@ -258,7 +258,7 @@ export function AuditScreen() {
         .af-tag { font-size: 12px; color: #9EABB8; }
         .af-actions { display: flex; gap: 8px; align-items: center; }
         .af-note-input { background: #0B0F14; border: 1px solid #33404D; border-radius: 6px; color: #F3F6F8; padding: 6px 10px; font-size: 13px; width: 160px; }
-        .lost-asset-card { border: 1px solid #4B2227; background: #1A1116; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
+        .lost-asset-card { border: 1px solid rgba(255, 137, 151, .3); background: linear-gradient(135deg, rgba(67, 27, 42, .58), rgba(29, 18, 28, .56)); border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.13), inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
       `}</style>
 
       <ScreenShell

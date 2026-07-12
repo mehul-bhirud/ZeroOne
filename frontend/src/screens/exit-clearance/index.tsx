@@ -132,7 +132,7 @@ export function ExitClearanceScreen() {
       <style>{`
         .clearance-layout { max-width: 800px; margin: 0 auto; }
         .blocker-section { margin-top: 32px; border-top: 1px solid #33404D; padding-top: 32px; }
-        .blocker-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #141A21; border: 1px solid #33404D; border-radius: 8px; margin-bottom: 12px; }
+        .blocker-item { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: linear-gradient(135deg, rgba(27, 49, 74, .7), rgba(12, 27, 43, .6)); border: 1px solid rgba(174, 213, 255, .18); border-radius: 10px; margin-bottom: 12px; box-shadow: 0 10px 25px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
         .blocker-title { font-weight: 600; color: #F3F6F8; margin-bottom: 4px; }
         .blocker-meta { font-size: 13px; color: #9EABB8; }
       `}</style>
