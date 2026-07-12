@@ -120,8 +120,8 @@ export function NotificationsScreen() {
         .tab-btn:hover { background: #1E262F; color: #F3F6F8; }
         .tab-btn.active { background: #19334E; color: #8FC8FF; }
         
-        .notif-card { background: #141A21; border: 1px solid #33404D; border-radius: 8px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .notif-card.unread { border-left: 4px solid #5AA7FF; background: #111B27; }
+        .notif-card { background: linear-gradient(135deg, rgba(27, 49, 74, .7), rgba(12, 27, 43, .6)); border: 1px solid rgba(174, 213, 255, .18); border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+        .notif-card.unread { border-left: 4px solid #78BCFF; background: linear-gradient(135deg, rgba(41, 82, 126, .62), rgba(17, 35, 57, .62)); }
         .notif-msg { font-size: 14px; color: #F3F6F8; margin-bottom: 4px; }
         .notif-time { font-size: 12px; color: #9EABB8; }
         
