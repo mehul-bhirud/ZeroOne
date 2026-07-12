@@ -1,9 +1,43 @@
-﻿import { useNavigate } from "react-router-dom";
-import { Button, ScreenShell, StatusChip } from "../../design-system";
+﻿import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button, ScreenShell, StatusChip, Skeleton, ErrorSummary } from "../../design-system";
 import { FeatureNavigation } from "./FeatureNavigation";
+import { useAuth } from "../../auth/AuthContext";
+import { getToken } from "../../auth/api";
 
-// ── Mock KPI data ─────────────────────────────────────────────────────────────
-const kpi = {
+const API_BASE = "/api/v1";
+const FIXTURE_MODE = import.meta.env.DEV && import.meta.env.VITE_USE_FIXTURES === "true";
+
+async function mFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers = new Headers({
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  });
+  new Headers(options.headers).forEach((v, k) => headers.set(k, v));
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({
+      error: { code: "UNKNOWN", message: "An unexpected error occurred." },
+    }));
+    throw body.error;
+  }
+  return res.json() as Promise<T>;
+}
+
+// ── Mock KPI data (used only in FIXTURE_MODE as fallback) ────────────────────
+export type KpiData = {
+  available_assets: number;
+  allocated_assets: number;
+  maintenance_today: number;
+  active_bookings: number;
+  pending_transfers: number;
+  upcoming_returns: number;
+  overdue_returns: number;
+  ghost_risk: number;
+};
+
+const fallbackKpi: KpiData = {
   available_assets: 142,
   allocated_assets: 318,
   maintenance_today: 7,
@@ -25,7 +59,7 @@ const overdueRows = [
 
 // ── KPI card config ───────────────────────────────────────────────────────────
 interface KpiConfig {
-  key: keyof typeof kpi;
+  key: keyof KpiData;
   label: string;
   icon: string;
   tone: "positive" | "info" | "warning" | "danger" | "neutral";
@@ -55,6 +89,29 @@ const tonePanel: Record<KpiConfig["tone"], string> = {
 // ── Component ─────────────────────────────────────────────────────────────────
 export function DashboardScreen() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const [kpiData, setKpiData] = useState<KpiData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadKpi() {
+      try {
+        const data = await mFetch<KpiData>("/dashboard/kpis");
+        setKpiData(data);
+      } catch (err: any) {
+        if (FIXTURE_MODE) {
+          setKpiData(fallbackKpi);
+        } else {
+          setError(err.message ?? "Failed to load dashboard KPIs.");
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    void loadKpi();
+  }, []);
 
   return (
     <>
@@ -255,120 +312,133 @@ export function DashboardScreen() {
       >
         {/* Feature nav */}
         <div className="feature-nav">
-          <FeatureNavigation role="employee" />
+          <FeatureNavigation role={user?.role as any} />
         </div>
 
-        {/* ── Quick Actions ─────────────────────────────────────── */}
-        <section className="quick-actions-section" aria-label="Quick actions">
-          <h2 className="quick-actions-title">Quick Actions</h2>
-          <div className="quick-actions-row">
-            <button
-              id="qa-register-asset"
-              className="qa-btn qa-btn--primary"
-              onClick={() => navigate("/assets")}
-            >
-              <span>+</span> Register Asset
-            </button>
-            <button
-              id="qa-book-resource"
-              className="qa-btn qa-btn--positive"
-              onClick={() => navigate("/bookings")}
-            >
-              <span>&#x25C8;</span> Book Resource
-            </button>
-            <button
-              id="qa-raise-maintenance"
-              className="qa-btn qa-btn--warning"
-              onClick={() => navigate("/maintenance")}
-            >
-              <span>&#x2699;</span> Raise Maintenance Request
-            </button>
-          </div>
-        </section>
+        {error && <ErrorSummary message={error} />}
 
-        {/* ── KPI Cards ─────────────────────────────────────────── */}
-        <section aria-label="KPI summary" className="kpi-grid">
-          {kpiCards.map(({ key, label, icon, tone, note }) => (
-            <div key={key} className={`kpi-card ${tonePanel[tone]}`}>
-              <div className="kpi-icon">{icon}</div>
-              <div className="kpi-value">{kpi[key]}</div>
-              <div className="kpi-label">{label}</div>
-              <div className="kpi-note">{note}</div>
-              {/* StatusChip re-uses Sarthak's chip classes */}
-              <div style={{ marginTop: 8 }}>
-                <StatusChip
-                  status={
-                    tone === "positive" ? "Available"
-                    : tone === "info"     ? "Ongoing"
-                    : tone === "warning"  ? "Pending"
-                    : tone === "danger"   ? "Lost"
-                    : "Completed"
-                  }
-                />
+        {loading ? (
+          <Skeleton lines={8} />
+        ) : kpiData && (
+          <>
+            {/* ── Quick Actions ─────────────────────────────────────── */}
+            <section className="quick-actions-section" aria-label="Quick actions">
+              <h2 className="quick-actions-title">Quick Actions</h2>
+              <div className="quick-actions-row">
+                {user?.role !== "employee" && (
+                  <button
+                    id="qa-register-asset"
+                    className="qa-btn qa-btn--primary"
+                    onClick={() => navigate("/assets")}
+                  >
+                    <span>+</span> Register Asset
+                  </button>
+                )}
+                <button
+                  id="qa-book-resource"
+                  className="qa-btn qa-btn--positive"
+                  onClick={() => navigate("/bookings")}
+                >
+                  <span>&#x25C8;</span> Book Resource
+                </button>
+                <button
+                  id="qa-raise-maintenance"
+                  className="qa-btn qa-btn--warning"
+                  onClick={() => navigate("/maintenance")}
+                >
+                  <span>&#x2699;</span> Raise Maintenance Request
+                </button>
               </div>
-            </div>
-          ))}
-        </section>
+            </section>
 
-        {/* ── Overdue Returns ───────────────────────────────────── */}
-        <section className="overdue-section" aria-label="Overdue returns">
-          <div className="overdue-header">
-            <div className="overdue-title-row">
-              <span className="overdue-badge" aria-hidden="true">&#x26A0;</span>
-              <h2 className="overdue-heading">
-                Overdue Returns &mdash; {kpi.overdue_returns} assets need immediate action
-              </h2>
-            </div>
-            {/* Link to Allocation Action screen */}
-            <Button
-              id="overdue-allocation-action"
-              onClick={() => navigate("/allocations")}
-              style={{ background: "#FF9AA5", color: "#2C0A10", flexShrink: 0 }}
-            >
-              Allocation Action &rarr;
-            </Button>
-          </div>
+            {/* ── KPI Cards ─────────────────────────────────────────── */}
+            <section aria-label="KPI summary" className="kpi-grid">
+              {kpiCards.map(({ key, label, icon, tone, note }) => {
+                const val = kpiData[key];
+                return (
+                  <div key={key} id={`kpi-${key}`} className={`kpi-card ${tonePanel[tone]}`}>
+                    <div className="kpi-icon" aria-hidden="true">{icon}</div>
+                    <div className="kpi-value">{val}</div>
+                    <div className="kpi-label">{label}</div>
+                    <div className="kpi-note">{note}</div>
+                    {/* StatusChip re-uses Sarthak's chip classes */}
+                    <div style={{ marginTop: 8 }}>
+                      <StatusChip
+                        status={
+                          tone === "positive" ? "Available"
+                          : tone === "info"     ? "Ongoing"
+                          : tone === "warning"  ? "Pending"
+                          : tone === "danger"   ? "Lost"
+                          : "Completed"
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
 
-          <table className="overdue-table">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Assignee</th>
-                <th>Department</th>
-                <th>Days Overdue</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overdueRows.map((row) => (
-                <tr key={row.id}>
-                  <td>
-                    <div className="asset-name">{row.asset}</div>
-                    <div className="asset-id">{row.id}</div>
-                  </td>
-                  <td style={{ color: "#F3F6F8" }}>{row.assignee}</td>
-                  <td style={{ color: "#9EABB8" }}>{row.dept}</td>
-                  <td>
-                    <span
-                      className={`days-pill ${
-                        row.daysOverdue >= 10
-                          ? "days-pill--critical"
-                          : row.daysOverdue >= 4
-                          ? "days-pill--warn"
-                          : "days-pill--mild"
-                      }`}
-                    >
-                      {row.daysOverdue}d overdue
-                    </span>
-                  </td>
-                  <td>
-                    <StatusChip status="Rejected" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+            {/* ── Overdue Returns ───────────────────────────────────── */}
+            <section className="overdue-section" aria-label="Overdue returns">
+              <div className="overdue-header">
+                <div className="overdue-title-row">
+                  <span className="overdue-badge" aria-hidden="true">&#x26A0;</span>
+                  <h2 className="overdue-heading">
+                    Overdue Returns &mdash; {kpiData.overdue_returns} assets need immediate action
+                  </h2>
+                </div>
+                {/* Link to Allocation Action screen */}
+                <Button
+                  id="overdue-allocation-action"
+                  onClick={() => navigate("/allocations")}
+                  style={{ background: "#FF9AA5", color: "#2C0A10", flexShrink: 0 }}
+                >
+                  Allocation Action &rarr;
+                </Button>
+              </div>
+
+              <table className="overdue-table">
+                <thead>
+                  <tr>
+                    <th>Asset</th>
+                    <th>Assignee</th>
+                    <th>Department</th>
+                    <th>Days Overdue</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {overdueRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <div className="asset-name">{row.asset}</div>
+                        <div className="asset-id">{row.id}</div>
+                      </td>
+                      <td style={{ color: "#F3F6F8" }}>{row.assignee}</td>
+                      <td style={{ color: "#9EABB8" }}>{row.dept}</td>
+                      <td>
+                        <span
+                          className={`days-pill ${
+                            row.daysOverdue >= 10
+                              ? "days-pill--critical"
+                              : row.daysOverdue >= 4
+                              ? "days-pill--warn"
+                              : "days-pill--mild"
+                          }`}
+                        >
+                          {row.daysOverdue}d overdue
+                        </span>
+                      </td>
+                      <td>
+                        <StatusChip status="Rejected" />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </>
+        )}
       </ScreenShell>
     </>
   );
