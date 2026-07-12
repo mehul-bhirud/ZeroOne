@@ -21,9 +21,31 @@ button, input { font: inherit; }
 .status-chip--danger { background: #4B2227; color: #FF9AA5; }
 .status-chip--neutral { background: #29323B; color: #C6D0D8; }
 .empty-state { display: flex; justify-content: space-between; align-items: center; }
-.error-summary { border-left: 4px solid #F87171; background: #351B20; padding: 12px 16px; }
+.error-summary { border-left: 4px solid #F87171; background: #351B20; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; color: #FF9AA5; font-size: 14px; }
 .skeleton { display: block; height: 14px; margin: 10px 0; border-radius: 7px; background: #1E262F; animation: pulse 1.3s infinite alternate; }
-.toast { position: fixed; right: 24px; bottom: 24px; background: #1E262F; border: 1px solid #33404D; border-radius: 10px; padding: 14px 18px; }
+.toast { position: fixed; right: 24px; bottom: 24px; background: #1E262F; border: 1px solid #33404D; border-radius: 10px; padding: 14px 18px; z-index: 1000; }
 .auth-card { max-width: 440px; }
+.input:focus { outline: none; border-color: #5AA7FF; box-shadow: 0 0 0 2px rgba(90,167,255,.18); }
+.input::placeholder { color: #5A6A78; }
+.button:hover:not(:disabled) { background: #7DBBFF; }
+.button--outline { background: transparent; border: 1px solid #33404D; color: #F3F6F8; }
+.button--outline:hover:not(:disabled) { border-color: #5AA7FF; color: #5AA7FF; }
+.button--danger { background: #F87171; color: #07111B; }
+.button--danger:hover:not(:disabled) { background: #FF9AA5; }
+.button--sm { padding: 6px 12px; font-size: 13px; }
+a { color: #5AA7FF; text-decoration: none; }
+a:hover { text-decoration: underline; }
+.table { width: 100%; border-collapse: collapse; }
+.table th { text-align: left; padding: 10px 12px; color: #9EABB8; font-size: 13px; font-weight: 600; border-bottom: 1px solid #33404D; }
+.table td { padding: 10px 12px; border-bottom: 1px solid #1E262F; font-size: 14px; }
+.table tr:hover td { background: #1E262F; }
+.tab-bar { display: flex; border-bottom: 1px solid #33404D; margin-bottom: 24px; gap: 0; }
+.tab-bar button { background: none; border: none; border-bottom: 2px solid transparent; color: #9EABB8; padding: 12px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.tab-bar button.active { color: #5AA7FF; border-bottom-color: #5AA7FF; }
+.tab-bar button:hover:not(.active) { color: #F3F6F8; }
+.search-bar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; }
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #1E262F; color: #9EABB8; }
 @keyframes pulse { to { opacity: .45; } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn .25s ease-out; }
 
