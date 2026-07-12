@@ -453,7 +453,7 @@ export function MaintenanceScreen() {
         }
         .mr-modal {
           width: min(480px, calc(100vw - 48px));
-          background: #141A21; border: 1px solid #33404D; border-radius: 16px; padding: 28px;
+          background: linear-gradient(135deg, rgba(27, 49, 74, .82), rgba(12, 27, 43, .78)); border: 1px solid rgba(174, 213, 255, .24); border-radius: 16px; padding: 28px; box-shadow: 0 18px 52px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.06); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
         }
         .mr-modal h2 { margin: 0 0 20px; font-size: 20px; color: #F3F6F8; }
         .mr-modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }

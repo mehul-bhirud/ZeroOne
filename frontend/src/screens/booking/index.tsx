@@ -361,7 +361,9 @@ export function BookingScreen() {
         .asset-tile {
           border: 1px solid #33404D;
           border-radius: 12px;
-          background: #141A21;
+          background: linear-gradient(135deg, rgba(27, 49, 74, .7), rgba(12, 27, 43, .6));
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
           padding: 14px 16px;
           cursor: pointer;
           transition: border-color .15s, background .15s;
@@ -386,7 +388,9 @@ export function BookingScreen() {
         .timeline-track {
           position: relative;
           height: 56px;
-          background: #141A21;
+          background: linear-gradient(135deg, rgba(27, 49, 74, .7), rgba(12, 27, 43, .6));
+          backdrop-filter: blur(14px);
+          -webkit-backdrop-filter: blur(14px);
           border: 1px solid #33404D;
           border-radius: 10px;
           overflow: hidden;
@@ -439,7 +443,9 @@ export function BookingScreen() {
         .booking-card {
           border: 1px solid #33404D;
           border-radius: 12px;
-          background: #141A21;
+          background: linear-gradient(135deg, rgba(27, 49, 74, .74), rgba(12, 27, 43, .64));
+          backdrop-filter: blur(16px);
+          -webkit-backdrop-filter: blur(16px);
           padding: 16px;
         }
         .booking-card--Ongoing  { border-color: #2A5C44; }
