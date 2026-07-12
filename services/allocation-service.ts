@@ -1,0 +1,96 @@
+import { AllocationOperations, Identifier, JsonRecord } from "./contracts";
+import { DatabaseClient } from "./db";
+import { BusinessConflictError, ValidationError } from "../domain/errors";
+import { assetStateMachine } from "../domain/workflows";
+
+export class AllocationService implements AllocationOperations {
+  constructor(private db: DatabaseClient) {}
+
+  async create(input: JsonRecord): Promise<JsonRecord> {
+    const { asset_id, holder_type, holder_id, expected_return_date } = input;
+    
+    if (!asset_id || !holder_type || !holder_id || !expected_return_date) {
+      throw new ValidationError("Missing required allocation fields");
+    }
+
+    try {
+      const sql = `
+        INSERT INTO allocations (id, asset_id, holder_type, holder_id, expected_return_date, allocated_at)
+        VALUES (gen_random_uuid(), $1, $2, $3, $4, now())
+        RETURNING *
+      `;
+      const params = [asset_id, holder_type, holder_id, expected_return_date];
+      
+      const { rows } = await this.db.query(sql, params);
+      
+      // We also need to update the asset state to allocated
+      await this.db.query(`UPDATE assets SET status = 'allocated' WHERE id = $1`, [asset_id]);
+      
+      return { allocation: rows[0] };
+    } catch (error: any) {
+      // 23505 is PostgreSQL unique_violation. We rely on the partial unique index.
+      if (error.code === '23505' && error.constraint === 'one_active_allocation') {
+        // Fetch current holder details to enrich the error
+        const { rows } = await this.db.query(`
+          SELECT a.holder_type, a.holder_id, u.name as holder_name 
+          FROM allocations a
+          LEFT JOIN users u ON a.holder_id = u.id
+          WHERE a.asset_id = $1 AND a.returned_at IS NULL
+        `, [asset_id]);
+
+        const currentHolder = rows[0];
+        const holderName = currentHolder?.holder_name || "Unknown";
+
+        // We fetch the asset tag for the error message
+        const { rows: assetRows } = await this.db.query(`SELECT asset_tag FROM assets WHERE id = $1`, [asset_id]);
+        const assetTag = assetRows[0]?.asset_tag || asset_id;
+
+        throw new BusinessConflictError(
+          "ASSET_ALREADY_ALLOCATED", 
+          `${assetTag} is with ${holderName}. Request a transfer instead.`,
+          {
+            asset_id,
+            current_allocation: currentHolder,
+            current_holder: currentHolder,
+            transfer_request_path: "/transfer-requests"
+          }
+        );
+      }
+      throw error;
+    }
+  }
+
+  async returnAsset(id: Identifier, input: JsonRecord): Promise<JsonRecord> {
+    const { return_condition_notes, action } = input;
+    
+    return await this.db.transaction(async (client) => {
+      // Find the allocation
+      const { rows: allocRows } = await client.query(`SELECT * FROM allocations WHERE id = $1 AND returned_at IS NULL`, [id]);
+      if (allocRows.length === 0) {
+        throw new BusinessConflictError("INVALID_ALLOCATION_STATE", "Allocation not found or already returned");
+      }
+      const allocation = allocRows[0];
+      
+      // Update the allocation
+      const { rows: updatedAllocRows } = await client.query(`
+        UPDATE allocations 
+        SET returned_at = now(), return_condition_notes = $2
+        WHERE id = $1
+        RETURNING *
+      `, [id, return_condition_notes]);
+
+      // Update the asset status back to available
+      const { rows: assetRows } = await client.query(`
+        UPDATE assets
+        SET status = 'available'
+        WHERE id = $1
+        RETURNING *
+      `, [allocation.asset_id]);
+
+      return {
+        allocation: updatedAllocRows[0],
+        asset: assetRows[0]
+      };
+    });
+  }
+}
