@@ -11,6 +11,7 @@ import {
   Toast,
 } from "../../design-system";
 import { getToken } from "../../auth/api";
+import { getAssets, type Asset } from "../asset-registry/api";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -260,6 +261,8 @@ const TABS: { id: Tab, label: string }[] = [
 
 export function MaintenanceScreen() {
   const [requests,   setRequests  ] = useState<MaintenanceRequest[]>([]);
+  const [assets,     setAssets    ] = useState<Asset[]>([]);
+  const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
   const [loading,    setLoading   ] = useState(true);
   const [loadError,  setLoadError ] = useState<string | null>(null);
   const [tab,        setTab       ] = useState<Tab>("All");
@@ -314,6 +317,12 @@ export function MaintenanceScreen() {
         }
       });
     return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    getAssets()
+      .then((data) => setAssets(data.assets))
+      .catch((err: ApiErrorShape) => setAssetLoadError(err.message ?? "Unable to load assets."));
   }, []);
 
   // Filter + search
@@ -564,9 +573,17 @@ export function MaintenanceScreen() {
             <h2>Report maintenance issue</h2>
             <form onSubmit={handleSubmit} noValidate>
               {formError && <ErrorSummary message={formError} />}
-              <FormField label="Asset ID">
-                <Input id="mr-form-asset-id" required placeholder="e.g. AF-0042"
-                  value={form.asset_id} onChange={(e) => setForm((f) => ({ ...f, asset_id: e.target.value }))} />
+              <FormField label="Asset">
+                <select id="mr-form-asset-id" className="mr-select" required
+                  value={form.asset_id} onChange={(e) => setForm((f) => ({ ...f, asset_id: e.target.value }))}>
+                  <option value="">Select an asset</option>
+                  {assets.map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {asset.asset_tag} — {asset.name} ({asset.status.replace("_", " ")})
+                    </option>
+                  ))}
+                </select>
+                {assetLoadError && <small className="mr-action-error">{assetLoadError}</small>}
               </FormField>
               <FormField label="Priority">
                 <select id="mr-form-priority" className="mr-select" value={form.priority}

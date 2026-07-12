@@ -54,6 +54,12 @@ export function mapDomainError(error: Error) {
         body: { error: { code: "VALIDATION_ERROR", message: `Missing required field: ${pgError.column}`, details: { column: pgError.column } } },
       };
     }
+    if (pgError.code === "22P02") {
+      return {
+        status: 400,
+        body: { error: { code: "VALIDATION_ERROR", message: "Use a valid asset UUID, not a display tag such as AF-0004.", details: { column: pgError.column } } },
+      };
+    }
   }
 
   // Fallback for raw PostgreSQL errors or unexpected crashes
