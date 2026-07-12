@@ -2,6 +2,8 @@ import { BookingOperations, Identifier, JsonRecord, Query } from "./contracts";
 import { DatabaseClient } from "./db";
 import { BusinessConflictError, ValidationError } from "../domain/errors";
 import { bookingStateMachine } from "../domain/workflows";
+import { logActivity } from "./activity-log";
+import { NotificationTriggers } from "./notification-service";
 
 export class BookingService implements BookingOperations {
   constructor(private db: DatabaseClient) {}
@@ -66,7 +68,17 @@ export class BookingService implements BookingOperations {
         const params = [asset_id, booked_by, start_time, end_time];
 
         const { rows } = await client.query(sql, params);
-        return { booking: rows[0] };
+        const booking = rows[0];
+
+        await logActivity(client, (input.actor_id as string) || (booked_by as string), "create", "Booking", booking.id, {
+          asset_id,
+          start_time,
+          end_time,
+        });
+
+        await NotificationTriggers.booking(client, booked_by as string, assetRows[0].asset_tag || (asset_id as string), "created");
+
+        return { booking };
       });
     } catch (error: any) {
       if (error.code === '23P01' && error.constraint === 'bookings_no_active_overlap_excl') {
@@ -100,12 +112,13 @@ export class BookingService implements BookingOperations {
   async cancel(id: Identifier, input: JsonRecord): Promise<JsonRecord> {
     const { reason } = input;
     return await this.db.transaction(async (client) => {
-      const { rows } = await client.query(`SELECT status FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
+      const { rows } = await client.query(`SELECT status, booked_by, asset_id FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
       if (rows.length === 0) {
         throw new ValidationError("Booking not found");
       }
       
-      const currentStatus = rows[0].status;
+      const booking = rows[0];
+      const currentStatus = booking.status;
       try {
         bookingStateMachine.transition(currentStatus as any, "cancelled");
       } catch (e: any) {
@@ -119,13 +132,23 @@ export class BookingService implements BookingOperations {
         RETURNING *
       `, [id]);
       
-      return { booking: updatedRows[0] };
+      const cancelledBooking = updatedRows[0];
+
+      const { rows: assetRows } = await client.query(`SELECT asset_tag FROM assets WHERE id = $1`, [booking.asset_id]);
+
+      await logActivity(client, (input.actor_id as string) || (booking.booked_by as string), "cancel", "Booking", id as string, {
+        reason,
+      });
+
+      await NotificationTriggers.booking(client, booking.booked_by, assetRows[0].asset_tag || booking.asset_id, "cancelled");
+
+      return { booking: cancelledBooking };
     });
   }
 
   async checkin(id: Identifier, input?: JsonRecord): Promise<JsonRecord> {
     return await this.db.transaction(async (client) => {
-      const { rows } = await client.query(`SELECT status, start_time, end_time FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
+      const { rows } = await client.query(`SELECT status, start_time, end_time, booked_by, asset_id FROM bookings WHERE id = $1 FOR UPDATE`, [id]);
       if (rows.length === 0) {
         throw new ValidationError("Booking not found");
       }
@@ -159,7 +182,15 @@ export class BookingService implements BookingOperations {
         RETURNING *
       `, [id]);
 
-      return { booking: updatedRows[0] };
+      const checkedInBooking = updatedRows[0];
+
+      const { rows: assetRows } = await client.query(`SELECT asset_tag FROM assets WHERE id = $1`, [booking.asset_id]);
+
+      await logActivity(client, (input?.actor_id as string) || (booking.booked_by as string), "checkin", "Booking", id as string, {});
+
+      await NotificationTriggers.booking(client, booking.booked_by, assetRows[0].asset_tag || booking.asset_id, "checked in");
+
+      return { booking: checkedInBooking };
     });
   }
 }

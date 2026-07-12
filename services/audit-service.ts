@@ -2,6 +2,8 @@ import { AuditOperations, Identifier, JsonRecord, Query } from "./contracts";
 import { DatabaseClient } from "./db";
 import { AuthorizationError, BusinessConflictError, ValidationError, TransitionError } from "../domain/errors";
 import { auditStateMachine, AuditState } from "../domain/workflows";
+import { logActivity } from "./activity-log";
+import { NotificationTriggers, triggerNotification } from "./notification-service";
 
 type AuditCycleRow = {
   id: string;
@@ -191,15 +193,12 @@ export class AuditService implements AuditOperations {
         : (await client.query(`UPDATE assets SET status = 'lost' WHERE id = ANY($1::uuid[]) RETURNING *`, [missingIds])).rows;
       const discrepancySummary = summary(scopedFindings);
 
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'close', 'AuditCycle', $2, $3)
-      `, [closedBy, id, JSON.stringify({ lost_assets_count: lostAssets.length })]);
-      await client.query(`
-        INSERT INTO notifications (id, user_id, type, message)
-        SELECT gen_random_uuid(), id, 'audit_closed', 'Audit cycle closed with ' || $1 || ' lost assets'
-        FROM users WHERE role IN ('admin', 'asset_manager')
-      `, [lostAssets.length]);
+      await logActivity(client, closedBy, 'close', 'AuditCycle', id as string, { lost_assets_count: lostAssets.length });
+      
+      const { rows: admins } = await client.query(`SELECT id FROM users WHERE role IN ('admin', 'asset_manager')`);
+      for (const admin of admins) {
+        await NotificationTriggers.auditDiscrepancy(client, admin.id, id as string, lostAssets.length);
+      }
 
       return {
         audit_cycle: { ...cycle, status: "closed" },

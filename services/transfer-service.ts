@@ -1,6 +1,12 @@
 import { TransferOperations, Identifier, JsonRecord } from "./contracts";
 import { DatabaseClient } from "./db";
 import { BusinessConflictError, ValidationError } from "../domain/errors";
+import { logActivity } from "./activity-log";
+import { NotificationTriggers } from "./notification-service";
+
+function isUserHolder(holderType: unknown): boolean {
+  return holderType === "user" || holderType === "employee";
+}
 
 export class TransferService implements TransferOperations {
   constructor(private db: DatabaseClient) {}
@@ -18,8 +24,20 @@ export class TransferService implements TransferOperations {
       RETURNING *
     `;
     const { rows } = await this.db.query(sql, [asset_id, JSON.stringify(from_holder), JSON.stringify(to_holder), requested_by]);
+    const transferRequest = rows[0];
+
+    await logActivity(this.db, requested_by as string, "transfer_requested", "Asset", asset_id as string, { transfer_request_id: transferRequest.id });
+
+    const { rows: assetRows } = await this.db.query(`SELECT asset_tag FROM assets WHERE id = $1`, [asset_id]);
     
-    return { transfer_request: rows[0] };
+    if (isUserHolder((from_holder as any)?.holder_type)) {
+      await NotificationTriggers.transfer(this.db, (from_holder as any).holder_id, assetRows[0].asset_tag || (asset_id as string), "requested");
+    }
+    if (isUserHolder((to_holder as any)?.holder_type)) {
+      await NotificationTriggers.transfer(this.db, (to_holder as any).holder_id, assetRows[0].asset_tag || (asset_id as string), "requested");
+    }
+
+    return { transfer_request: transferRequest };
   }
 
   async approve(id: Identifier, input: JsonRecord): Promise<JsonRecord> {
@@ -77,11 +95,15 @@ export class TransferService implements TransferOperations {
         RETURNING *
       `, [transferRequest.asset_id, toHolder.holder_type, toHolder.holder_id, toHolder.expected_return_date || null]);
 
-      // Write ActivityLog
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'transfer_approved', 'Asset', $2, $3)
-      `, [approved_by, transferRequest.asset_id, JSON.stringify({ transfer_request_id: id })]);
+      await logActivity(client, approved_by as string, 'transfer_approved', 'Asset', transferRequest.asset_id, { transfer_request_id: id });
+
+      const { rows: assetRows } = await client.query(`SELECT asset_tag FROM assets WHERE id = $1`, [transferRequest.asset_id]);
+      if (isUserHolder(fromHolder?.holder_type)) {
+        await NotificationTriggers.transfer(client, fromHolder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "approved");
+      }
+      if (isUserHolder(toHolder?.holder_type)) {
+        await NotificationTriggers.transfer(client, toHolder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "approved");
+      }
 
       return {
         transfer_request: updatedTrRows[0],
@@ -104,6 +126,19 @@ export class TransferService implements TransferOperations {
       throw new BusinessConflictError("INVALID_TRANSFER_STATE", "Transfer request not found or already resolved.");
     }
 
-    return { transfer_request: rows[0] };
+    const transferRequest = rows[0];
+
+    await logActivity(this.db, (input.rejected_by as string) || null, "transfer_rejected", "Asset", transferRequest.asset_id, { transfer_request_id: id, reason });
+
+    const { rows: assetRows } = await this.db.query(`SELECT asset_tag FROM assets WHERE id = $1`, [transferRequest.asset_id]);
+    
+    if (isUserHolder(transferRequest.from_holder?.holder_type)) {
+      await NotificationTriggers.transfer(this.db, transferRequest.from_holder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "rejected");
+    }
+    if (isUserHolder(transferRequest.to_holder?.holder_type)) {
+      await NotificationTriggers.transfer(this.db, transferRequest.to_holder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "rejected");
+    }
+
+    return { transfer_request: transferRequest };
   }
 }

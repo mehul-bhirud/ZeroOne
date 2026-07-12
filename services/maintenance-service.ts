@@ -2,6 +2,8 @@ import { MaintenanceOperations, Identifier, JsonRecord } from "./contracts";
 import { DatabaseClient } from "./db";
 import { BusinessConflictError, ValidationError } from "../domain/errors";
 import { maintenanceStateMachine, assetStateMachine, MaintenanceState, AssetState } from "../domain/workflows";
+import { logActivity } from "./activity-log";
+import { NotificationTriggers } from "./notification-service";
 
 export class MaintenanceService implements MaintenanceOperations {
   constructor(private db: DatabaseClient) {}
@@ -62,11 +64,7 @@ export class MaintenanceService implements MaintenanceOperations {
       const { rows } = await client.query(sql, [asset_id, raised_by, issue_description, priority, photo_url ?? null]);
       const maintenanceRequest = rows[0];
 
-      // Activity log
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'maintenance_requested', 'Asset', $2, $3)
-      `, [raised_by, asset_id, JSON.stringify({ maintenance_request_id: maintenanceRequest.id, issue: issue_description })]);
+      await logActivity(client, raised_by as string, 'maintenance_requested', 'Asset', asset_id as string, { maintenance_request_id: maintenanceRequest.id, issue: issue_description });
 
       return { maintenance_request: maintenanceRequest };
     });
@@ -88,14 +86,9 @@ export class MaintenanceService implements MaintenanceOperations {
       
       const { rows: updatedAssets } = await client.query(`UPDATE assets SET status = 'under_maintenance' WHERE id = $1 RETURNING *`, [req.asset_id]);
 
-      // Activity log
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'maintenance_approved', 'Asset', $2, $3)
-      `, [approved_by, req.asset_id, JSON.stringify({ maintenance_request_id: id })]);
+      await logActivity(client, approved_by as string, 'maintenance_approved', 'Asset', req.asset_id, { maintenance_request_id: id });
 
-      // Notification
-      await this.notify(client, req.raised_by, 'maintenance_update', `Your maintenance request for asset ${req.asset_id} has been approved.`);
+      await NotificationTriggers.maintenance(client, req.raised_by, updatedAssets[0].asset_tag || req.asset_id, "approved");
 
       return { maintenance_request: req, asset: updatedAssets[0] };
     });
@@ -108,14 +101,10 @@ export class MaintenanceService implements MaintenanceOperations {
     return await this.db.transaction(async (client) => {
       const req = await this.getAndTransition(client, id, 'rejected');
 
-      // Activity log
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'maintenance_rejected', 'Asset', $2, $3)
-      `, [rejected_by, req.asset_id, JSON.stringify({ maintenance_request_id: id, reason: reason || null })]);
+      await logActivity(client, rejected_by as string, 'maintenance_rejected', 'Asset', req.asset_id, { maintenance_request_id: id, reason: reason || null });
 
-      // Notification
-      await this.notify(client, req.raised_by, 'maintenance_update', `Your maintenance request for asset ${req.asset_id} was rejected.`);
+      const { rows: assetRows } = await client.query(`SELECT asset_tag FROM assets WHERE id = $1`, [req.asset_id]);
+      await NotificationTriggers.maintenance(client, req.raised_by, assetRows[0].asset_tag || req.asset_id, "rejected");
 
       return { maintenance_request: req };
     });
@@ -128,11 +117,7 @@ export class MaintenanceService implements MaintenanceOperations {
     return await this.db.transaction(async (client) => {
       const req = await this.getAndTransition(client, id, 'technician_assigned', { technician });
 
-      // Activity log
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'technician_assigned', 'Asset', $2, $3)
-      `, [assigned_by, req.asset_id, JSON.stringify({ maintenance_request_id: id, technician })]);
+      await logActivity(client, assigned_by as string, 'technician_assigned', 'Asset', req.asset_id, { maintenance_request_id: id, technician });
 
       return { maintenance_request: req };
     });
@@ -145,11 +130,7 @@ export class MaintenanceService implements MaintenanceOperations {
     return await this.db.transaction(async (client) => {
       const req = await this.getAndTransition(client, id, 'in_progress');
 
-      // Activity log
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'maintenance_started', 'Asset', $2, $3)
-      `, [actor_id, req.asset_id, JSON.stringify({ maintenance_request_id: id })]);
+      await logActivity(client, actor_id as string, 'maintenance_started', 'Asset', req.asset_id, { maintenance_request_id: id });
 
       return { maintenance_request: req };
     });
@@ -172,14 +153,9 @@ export class MaintenanceService implements MaintenanceOperations {
       
       const { rows: updatedAssets } = await client.query(`UPDATE assets SET status = $2 WHERE id = $1 RETURNING *`, [req.asset_id, targetState]);
 
-      // Activity log
-      await client.query(`
-        INSERT INTO activity_log (id, actor_id, action, entity_type, entity_id, metadata)
-        VALUES (gen_random_uuid(), $1, 'maintenance_resolved', 'Asset', $2, $3)
-      `, [resolved_by, req.asset_id, JSON.stringify({ maintenance_request_id: id, resolution_notes, return_state: targetState })]);
+      await logActivity(client, resolved_by as string, 'maintenance_resolved', 'Asset', req.asset_id, { maintenance_request_id: id, resolution_notes, return_state: targetState });
 
-      // Notification
-      await this.notify(client, req.raised_by, 'maintenance_update', `Your maintenance request for asset ${req.asset_id} has been resolved.`);
+      await NotificationTriggers.maintenance(client, req.raised_by, updatedAssets[0].asset_tag || req.asset_id, "resolved");
 
       return { maintenance_request: req, asset: updatedAssets[0] };
     });
@@ -214,12 +190,5 @@ export class MaintenanceService implements MaintenanceOperations {
 
     const { rows: updatedRows } = await client.query(updateSql, params);
     return updatedRows[0];
-  }
-
-  private async notify(client: DatabaseClient, user_id: string, type: string, message: string) {
-    await client.query(`
-      INSERT INTO notifications (id, user_id, type, message)
-      VALUES (gen_random_uuid(), $1, $2, $3)
-    `, [user_id, type, message]);
   }
 }
