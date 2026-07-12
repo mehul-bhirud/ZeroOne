@@ -63,9 +63,9 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div style={{ flex: 1, padding: "12px 0" }}>
           {visibleItems.map((item) => (
-            <a
+            <Link
               key={item.to}
-              href={item.to}
+              to={item.to}
               style={{
                 display: "block",
                 padding: "10px 20px",
@@ -77,7 +77,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
               }}
             >
               {item.label}
-            </a>
+            </Link>
           ))}
         </div>
 
