@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ScreenShell, Skeleton, Button, EmptyState, Input } from "../../design-system";
+import { ScreenShell, Skeleton, Button, EmptyState, ErrorSummary, Input } from "../../design-system";
 import { getToken } from "../../auth/api";
 
 const API_BASE = "/api/v1";
@@ -17,7 +17,7 @@ async function mFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const body = await res.json().catch(() => ({
       error: { code: "UNKNOWN", message: "An unexpected error occurred." },
     }));
-    throw body.error;
+    throw body.error ?? { code: "UNKNOWN", message: "An unexpected error occurred." };
   }
   return res.json() as Promise<T>;
 }
@@ -31,6 +31,7 @@ export function ReportsScreen() {
   const [department, setDepartment] = useState("");
   const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   
   // Data states
   const [utilizationData, setUtilizationData] = useState<any>(null);
@@ -41,11 +42,12 @@ export function ReportsScreen() {
   const [creatingAudit, setCreatingAudit] = useState(false);
 
   useEffect(() => {
-    fetchReportData();
-  }, [activeTab, department, location]);
+    void fetchReportData();
+  }, [activeTab]);
 
   async function fetchReportData() {
     setLoading(true);
+    setError("");
     const qs = new URLSearchParams();
     if (department) qs.set("department", department);
     if (location) qs.set("location", location);
@@ -67,8 +69,11 @@ export function ReportsScreen() {
         const d = await mFetch(`/reports/ghost-risk?${qs.toString()}`);
         setGhostData(d);
       }
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      const message = typeof err?.message === "string" && err.message.trim()
+        ? err.message
+        : "Unable to load this report. Please try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -98,16 +103,18 @@ export function ReportsScreen() {
         a.click();
         a.remove();
       })
-      .catch(e => alert(e.message));
+      .catch(e => setError(e?.message || "Export failed. Please try again."));
   }
 
   async function handleInitiateAudit() {
     if (!ghostData?.assets?.length) return;
     setCreatingAudit(true);
     try {
+      const today = new Date();
+      const asDate = (date: Date) => date.toISOString().slice(0, 10);
       const payload: any = {
-        date_range_start: new Date().toISOString(),
-        date_range_end: new Date(Date.now() + 7 * 86400000).toISOString()
+        date_range_start: asDate(today),
+        date_range_end: asDate(new Date(today.getTime() + 7 * 86400000))
       };
       if (department) payload.scope_department_id = department;
       if (location) payload.scope_location = location;
@@ -118,7 +125,7 @@ export function ReportsScreen() {
       });
       navigate(`/audit`);
     } catch (err: any) {
-      alert(err.message || "Failed to create audit cycle");
+      setError(err?.message || "Failed to create audit cycle");
     } finally {
       setCreatingAudit(false);
     }
@@ -239,6 +246,7 @@ export function ReportsScreen() {
         </div>
 
         <div className="panel" style={{ padding: 16 }}>
+          {error && <div style={{ marginBottom: 16 }}><ErrorSummary message={error} /></div>}
           {loading ? (
             <Skeleton lines={8} />
           ) : (
@@ -303,8 +311,8 @@ export function ReportsScreen() {
                           <tr key={a.id}>
                             <td style={{fontFamily: "monospace"}}>{a.id}</td>
                             <td>{a.name}</td>
-                            <td>{new Date(a.last_verified_at).toLocaleDateString()}</td>
-                            <td style={{ color: "#FF9AA5", fontWeight: 700 }}>{Math.floor((Date.now() - new Date(a.last_verified_at).getTime()) / 86400000)}</td>
+                            <td>{a.last_verified_at ? new Date(a.last_verified_at).toLocaleDateString() : "Never"}</td>
+                            <td style={{ color: "#FF9AA5", fontWeight: 700 }}>{a.days_since_verified ?? "—"}</td>
                           </tr>
                         ))}
                       </tbody>
