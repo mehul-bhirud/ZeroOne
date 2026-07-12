@@ -11,6 +11,7 @@ import {
   StatusChip,
   Toast,
 } from "../../design-system";
+import type { Status } from "../../design-system";
 import { getToken } from "../../auth/api";
 
 const API_BASE = "/api/v1";
@@ -24,7 +25,7 @@ interface AuditCycle {
   scope_location?: string;
   date_range_start: string;
   date_range_end: string;
-  status: "active" | "closed";
+  status: "draft" | "active" | "closed";
   created_by?: string;
 }
 
@@ -95,6 +96,7 @@ export function AuditScreen() {
   // We manage the list of assets to audit based on the scope.
   const [findings, setFindings] = useState<LocalFinding[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [assetLoadError, setAssetLoadError] = useState<string | null>(null);
   const [savingFindings, setSavingFindings] = useState(false);
   
   const [closing, setClosing] = useState(false);
@@ -120,8 +122,8 @@ export function AuditScreen() {
     setCreating(true);
     try {
       const payload: Record<string, string> = {
-        date_range_start: new Date(createStart).toISOString(),
-        date_range_end: new Date(createEnd).toISOString(),
+        date_range_start: createStart,
+        date_range_end: createEnd,
       };
       if (createDept.trim()) payload.scope_department_id = createDept.trim();
       if (createLoc.trim()) payload.scope_location = createLoc.trim();
@@ -145,6 +147,7 @@ export function AuditScreen() {
   // so we fetch all assets matching the scope to build our checklist.
   async function loadAssetsForScope(dept?: string, loc?: string) {
     setLoadingAssets(true);
+    setAssetLoadError(null);
     try {
       const params = new URLSearchParams();
       if (dept) params.append("department", dept);
@@ -161,8 +164,9 @@ export function AuditScreen() {
         saved: false,
       }));
       setFindings(initialFindings);
-    } catch (err) {
-      console.error("Failed to load assets for scope", err);
+    } catch (err: any) {
+      setFindings([]);
+      setAssetLoadError(err?.message ?? "Unable to load assets for this audit scope. Please try again.");
     } finally {
       setLoadingAssets(false);
     }
@@ -235,12 +239,12 @@ export function AuditScreen() {
   }
 
   // Formatting helpers
-  function fmtStatus(r: FindingResult) {
-    if (r === "verified") return "Verified";
-    if (r === "damaged") return "Damaged";
-    if (r === "missing") return "Missing";
-    return "Pending";
-  }
+  const findingStatusLabels: Record<FindingResult, Status> = {
+    verified: "Verified",
+    damaged: "Damaged",
+    missing: "Missing",
+    pending: "Pending",
+  };
 
   return (
     <>
@@ -321,7 +325,9 @@ export function AuditScreen() {
                 </p>
               </div>
 
-              {loadingAssets ? (
+              {assetLoadError ? (
+                <ErrorSummary message={assetLoadError} />
+              ) : loadingAssets ? (
                 <Skeleton lines={6} />
               ) : findings.length === 0 ? (
                 <EmptyState title="No assets found in this scope." />
@@ -337,7 +343,7 @@ export function AuditScreen() {
                       {f.saved ? (
                         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                           {f.notes && <span style={{ fontSize: 12, color: "#9EABB8" }}>"{f.notes}"</span>}
-                          <StatusChip status={fmtStatus(f.result) as any} />
+                          <StatusChip status={findingStatusLabels[f.result]} />
                         </div>
                       ) : (
                         <div className="af-actions">
