@@ -12,6 +12,10 @@ export interface LoginInput {
   password: string;
 }
 
+export interface ForgotPasswordInput {
+  email: string;
+}
+
 export interface AuthResponse {
   access_token: string;
   user: AuthUser;
@@ -20,7 +24,6 @@ export interface AuthResponse {
 export interface AuthService {
   signup(input: SignupInput): Promise<AuthResponse>;
   login(input: LoginInput): Promise<AuthResponse>;
-  forgotPassword(email: string): Promise<{ accepted: true }>;
+  forgotPassword(input: ForgotPasswordInput): Promise<{ accepted: true }>;
   me(token: string): Promise<{ user: AuthUser }>;
 }
-
