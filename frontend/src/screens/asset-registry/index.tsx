@@ -352,10 +352,171 @@ function RegisterAssetModal({
   );
 }
 
+import { useParams } from "react-router-dom";
+import { getAssetById, updateAsset } from "./api";
+
 export function AssetPassportScreen() {
+  const { id } = useParams<{ id: string }>();
+  const [data, setData] = useState<any>(null);
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  
+  const [editingStatus, setEditingStatus] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (id) {
+      loadData(id);
+    }
+  }, [id]);
+
+  async function loadData(assetId: string) {
+    setLoading(true);
+    setError("");
+    try {
+      const [passport, cats] = await Promise.all([
+        getAssetById(assetId),
+        getCategories().catch(() => [])
+      ]);
+      setData(passport);
+      setCategories(cats);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load asset passport.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleStatusUpdate(e: FormEvent) {
+    e.preventDefault();
+    if (!id || !newStatus) return;
+    setSaving(true);
+    try {
+      await updateAsset(id, { status: newStatus });
+      setEditingStatus(false);
+      loadData(id);
+      setToast("Status updated successfully.");
+      setTimeout(() => setToast(""), 3000);
+    } catch (err: any) {
+      alert(err?.message || "Failed to update status.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <ScreenShell title="Asset passport" description=""><Skeleton lines={8} /></ScreenShell>;
+  if (error || !data?.asset) return <ScreenShell title="Asset passport" description=""><ErrorSummary message={error || "Asset not found"} /></ScreenShell>;
+
+  const { asset, allocations, transfer_requests, bookings, maintenance_requests, audit_findings, activity } = data;
+  const categoryName = categories.find(c => c.id === asset.category_id)?.name || "Unknown";
+
+  // Build chronological timeline
+  const timeline: { date: string; type: string; title: string; desc: string }[] = [];
+  
+  allocations?.forEach((a: any) => timeline.push({ date: a.allocated_at, type: "allocation", title: "Allocated", desc: `To ${a.holder_type}` }));
+  transfer_requests?.forEach((t: any) => timeline.push({ date: t.created_at, type: "transfer", title: "Transfer Request", desc: `Status: ${t.status}` }));
+  bookings?.forEach((b: any) => timeline.push({ date: b.created_at, type: "booking", title: "Booking Created", desc: `From ${b.start_date} to ${b.end_date}` }));
+  maintenance_requests?.forEach((m: any) => timeline.push({ date: m.created_at, type: "maintenance", title: "Maintenance", desc: m.issue_description }));
+  audit_findings?.forEach((af: any) => timeline.push({ date: af.created_at, type: "audit", title: "Audit Finding", desc: `Status: ${af.status}` }));
+  activity?.forEach((act: any) => timeline.push({ date: act.created_at, type: "activity", title: "Activity", desc: act.action }));
+
+  // Push creation event
+  timeline.push({ date: asset.created_at || asset.acquisition_date || new Date().toISOString(), type: "creation", title: "Asset Registered", desc: `Acquired on ${asset.acquisition_date}` });
+
+  // Sort newest first
+  timeline.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   return (
-    <ScreenShell title="Asset passport" description="Custody, bookings, maintenance, audits, and activity appear chronologically.">
-      <EmptyState title="Select an asset from the registry to view its passport." />
+    <ScreenShell title={`Passport: ${asset.name}`} description={`Asset Tag: ${asset.asset_tag} | Serial: ${asset.serial_number}`}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
+        
+        {/* Main Timeline Column */}
+        <div className="panel" style={{ padding: 24 }}>
+          <h2 style={{ marginTop: 0, fontSize: 18, borderBottom: "1px solid #1E262F", paddingBottom: 16 }}>Lifecycle Timeline</h2>
+          {timeline.length === 0 ? (
+            <p style={{ color: "#9EABB8" }}>No activity recorded yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 16 }}>
+              {timeline.map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: 16 }}>
+                  <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#4E6172", marginTop: 4, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>{item.title}</div>
+                    <div style={{ fontSize: 13, color: "#9EABB8", marginBottom: 4 }}>
+                      {new Date(item.date).toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 14 }}>{item.desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sidebar Info Column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="panel" style={{ padding: 20 }}>
+            <h3 style={{ marginTop: 0, fontSize: 16, marginBottom: 16 }}>Current Status</h3>
+            
+            {editingStatus ? (
+              <form onSubmit={handleStatusUpdate}>
+                <select className="input" value={newStatus} onChange={e => setNewStatus(e.target.value)} disabled={saving} style={{ width: "100%", marginBottom: 8 }}>
+                  <option value="">Select status...</option>
+                  <option value="available">Available</option>
+                  <option value="allocated">Allocated</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="under_maintenance">Under Maintenance</option>
+                  <option value="lost">Lost</option>
+                  <option value="retired">Retired</option>
+                  <option value="disposed">Disposed</option>
+                </select>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button type="submit" disabled={saving}>Save</Button>
+                  <button type="button" className="button button--outline" onClick={() => setEditingStatus(false)}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <StatusChip status={asset.status.replace("_", " ") as any} />
+                <button className="button button--outline button--sm" onClick={() => { setEditingStatus(true); setNewStatus(asset.status); }}>Update</button>
+              </div>
+            )}
+          </div>
+
+          <div className="panel" style={{ padding: 20 }}>
+            <h3 style={{ marginTop: 0, fontSize: 16, marginBottom: 16 }}>Details</h3>
+            <div style={{ display: "grid", gap: 12, fontSize: 14 }}>
+              <div>
+                <div style={{ color: "#9EABB8", fontSize: 12 }}>Category</div>
+                <div>{categoryName}</div>
+              </div>
+              <div>
+                <div style={{ color: "#9EABB8", fontSize: 12 }}>Location</div>
+                <div>{asset.location}</div>
+              </div>
+              <div>
+                <div style={{ color: "#9EABB8", fontSize: 12 }}>Condition</div>
+                <div style={{ textTransform: "capitalize" }}>{asset.condition}</div>
+              </div>
+              <div>
+                <div style={{ color: "#9EABB8", fontSize: 12 }}>Acquisition Cost</div>
+                <div>${asset.acquisition_cost}</div>
+              </div>
+              {asset.last_verified_at && (
+                <div>
+                  <div style={{ color: "#9EABB8", fontSize: 12 }}>Last Verified</div>
+                  <div>{new Date(asset.last_verified_at).toLocaleDateString()}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+      </div>
+      {toast && <Toast message={toast} />}
     </ScreenShell>
   );
 }
