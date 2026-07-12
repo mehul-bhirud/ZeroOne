@@ -45,7 +45,7 @@ describe("MaintenanceService", () => {
 
       // Verify asset status update was called
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE assets SET status = 'under_maintenance' WHERE id = $1", 
+        "UPDATE assets SET status = 'under_maintenance' WHERE id = $1 RETURNING *",
         ["a1"]
       );
     });
@@ -82,7 +82,7 @@ describe("MaintenanceService", () => {
       expect((result.maintenance_request as any).status).toBe("resolved");
 
       expect(db.query).toHaveBeenCalledWith(
-        "UPDATE assets SET status = $2 WHERE id = $1", 
+        "UPDATE assets SET status = $2 WHERE id = $1 RETURNING *",
         ["a1", "available"]
       );
     });

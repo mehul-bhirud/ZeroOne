@@ -5,6 +5,10 @@ import { AuthError } from "./errors";
 import { authenticateBearer } from "./middleware";
 import { PgUserRepository, type UserRepository } from "./repository";
 import { AuthService } from "./service";
+import { ForbiddenError } from "./rbac";
+import { createDomainRouter } from "./domain-router";
+import { mapDomainError } from "../services/error-mapper";
+import { createDatabaseClient, type DatabaseClient } from "../services/db";
 
 function asyncRoute(handler: RequestHandler): RequestHandler {
   return (request, response, next) => Promise.resolve(handler(request, response, next)).catch(next);
@@ -20,7 +24,12 @@ function errorHandler(): ErrorRequestHandler {
       response.status(400).json({ error: { code: "AUTH_INVALID_INPUT", message: "The request body is not valid JSON. Correct it and try again.", details: {} } });
       return;
     }
-    response.status(500).json({ error: { code: "INTERNAL_ERROR", message: "We could not complete that request. Try again shortly.", details: {} } });
+    if (error instanceof ForbiddenError) {
+      response.status(403).json({ error: { code: "FORBIDDEN", message: error.message, details: {} } });
+      return;
+    }
+    const mapped = mapDomainError(error instanceof Error ? error : new Error("Unexpected error"));
+    response.status(mapped.status).json(mapped.body);
   };
 }
 
@@ -44,10 +53,11 @@ export function createAuthRouter(config: AuthConfig, repository: UserRepository)
   return router;
 }
 
-export function createAuthApp(config: AuthConfig, repository: UserRepository): Express {
+export function createAuthApp(config: AuthConfig, repository: UserRepository, database?: DatabaseClient): Express {
   const app = express();
   app.use(express.json({ limit: "32kb" }));
   app.use("/api/v1/auth", createAuthRouter(config, repository));
+  if (database) app.use("/api/v1", createDomainRouter(config, repository, database));
   app.use(errorHandler());
   return app;
 }
@@ -57,5 +67,5 @@ export function createAuthAppFromDatabase(config: AuthConfig, databaseUrl = proc
   const appRole = process.env.DATABASE_APP_ROLE;
   if (appRole && !/^[a-z_][a-z0-9_]*$/.test(appRole)) throw new Error("DATABASE_APP_ROLE must be a simple PostgreSQL role name.");
   const pool = new Pool({ connectionString: databaseUrl, options: appRole ? `-c role=${appRole}` : undefined });
-  return { app: createAuthApp(config, new PgUserRepository(pool)), pool };
+  return { app: createAuthApp(config, new PgUserRepository(pool), createDatabaseClient(pool)), pool };
 }

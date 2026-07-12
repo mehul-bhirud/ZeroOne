@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Pool, PoolClient } from "pg";
 import { AuditService } from "../../services/audit-service";
-import type { DatabaseClient } from "../../services/db";
+import { createDatabaseClient, type DatabaseClient } from "../../services/db";
 
 const adminUrl = process.env.TEST_DATABASE_ADMIN_URL ?? "postgres://assetflow:assetflow@localhost:5432/postgres";
 const migrationFiles = ["001_extensions.sql", "002_schema_v0.sql", "003_canonical_constraints.sql", "004_activity_log_append_only.sql"];
@@ -27,26 +27,7 @@ describe("Audit Integration", () => {
       await pool.query(await readFile(resolve(process.cwd(), "db", "migrations", migration), "utf8"));
     }
 
-    dbClient = {
-      query: async (sql, params) => pool.query(sql, params),
-      transaction: async (cb) => {
-        const client = await pool.connect();
-        try {
-          await client.query("BEGIN");
-          const result = await cb({
-            query: async (sql, params) => client.query(sql, params),
-            transaction: async (nestedCb) => nestedCb(client as any), // simplified for nested
-          });
-          await client.query("COMMIT");
-          return result;
-        } catch (e) {
-          await client.query("ROLLBACK");
-          throw e;
-        } finally {
-          client.release();
-        }
-      }
-    };
+    dbClient = createDatabaseClient(pool);
 
     service = new AuditService(dbClient);
   }, 30_000);
@@ -57,7 +38,7 @@ describe("Audit Integration", () => {
     await adminPool?.end();
   });
 
-  it.skip("closing an audit cycle marks confirmed-missing assets as Lost", async () => {
+  it("closing an audit cycle marks confirmed-missing assets as Lost", async () => {
     // 1. Arrange: Create user, category, and two assets
     const adminId = randomUUID();
     const catId = randomUUID();
@@ -85,7 +66,8 @@ describe("Audit Integration", () => {
       date_range_start: '2026-07-01',
       date_range_end: '2026-07-31',
       created_by: adminId,
-    });
+    }) as { audit_cycle: { id: string } };
+    await dbClient.query("UPDATE audit_cycles SET status = 'active' WHERE id = $1", [audit_cycle.id]);
     
     // Assign Auditor
     await service.assignAuditors(audit_cycle.id, {
@@ -109,8 +91,9 @@ describe("Audit Integration", () => {
 
     // 2. Act: Close cycle
     const result = await service.close(audit_cycle.id, {
+      confirmation: true,
       closed_by: adminId
-    });
+    }) as { audit_cycle: { status: string }; assets_marked_lost: Array<{ id: string }> };
 
     // 3. Assert: 
     expect(result.audit_cycle.status).toBe('closed');
