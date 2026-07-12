@@ -48,4 +48,3 @@ a:hover { text-decoration: underline; }
 @keyframes pulse { to { opacity: .45; } }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 .fade-in { animation: fadeIn .25s ease-out; }
-

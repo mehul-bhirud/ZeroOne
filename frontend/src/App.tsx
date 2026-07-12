@@ -78,6 +78,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
             >
               {item.label}
             </NavLink>
+          ))}
         </div>
 
         <div style={{ padding: "16px 20px", borderTop: "1px solid #33404D" }}>
