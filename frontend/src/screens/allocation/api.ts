@@ -64,14 +64,14 @@ export async function getTransferRequests() {
 
 export async function approveTransferRequest(id: string) {
   const data = await apiFetch<any>(`/transfer-requests/${id}/approve`, {
-    method: "POST",
+    method: "PATCH",
   });
   return data;
 }
 
 export async function rejectTransferRequest(id: string, reason: string) {
   const data = await apiFetch<any>(`/transfer-requests/${id}/reject`, {
-    method: "POST",
+    method: "PATCH",
     body: JSON.stringify({ reason }),
   });
   return data;

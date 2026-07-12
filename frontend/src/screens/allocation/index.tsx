@@ -9,7 +9,6 @@ import {
   Toast,
   Skeleton
 } from "../../design-system";
-import { useAuth } from "../../auth/AuthContext";
 import {
   createAllocation,
   returnAllocation,
@@ -24,7 +23,6 @@ import {
 import { getAssetById } from "../asset-registry/api";
 
 export function AllocationScreen() {
-  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<"allocate" | "returns" | "transfers">("allocate");
 
   return (
@@ -75,7 +73,10 @@ function AllocateTab() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!assetId || !holderType || !holderId) return;
+    if (!assetId || !holderType || !holderId || !expectedReturnDate) {
+      setError({ message: "Select an asset, a holder, and an expected return date before allocating." });
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -89,6 +90,7 @@ function AllocateTab() {
       });
       setToast("Asset allocated successfully.");
       setTimeout(() => setToast(""), 3000);
+      setAssets((current) => current.filter((asset) => asset.id !== assetId));
       setAssetId("");
       setHolderId("");
       setExpectedReturnDate("");
@@ -170,8 +172,8 @@ function AllocateTab() {
           </FormField>
         </div>
 
-        <FormField label="Expected Return Date">
-          <Input type="date" value={expectedReturnDate} onChange={e => setExpectedReturnDate(e.target.value)} disabled={loading} />
+        <FormField label="Expected Return Date *">
+          <Input required type="date" value={expectedReturnDate} onChange={e => setExpectedReturnDate(e.target.value)} disabled={loading} />
         </FormField>
 
         <div style={{ marginTop: 16 }}>
@@ -221,6 +223,7 @@ function ReturnTab() {
       await returnAllocation(allocationId, { return_condition_notes: notes });
       setToast("Asset returned successfully.");
       setTimeout(() => setToast(""), 3000);
+      setError("");
       setAssetId("");
       setAllocationId("");
       setNotes("");
@@ -290,7 +293,10 @@ function TransfersTab() {
         setToast("Transfer approved.");
       } else {
         const reason = prompt("Reason for rejection:");
-        if (reason === null) return;
+        if (reason === null) {
+          setLoading(false);
+          return;
+        }
         await rejectTransferRequest(id, reason || "No reason provided");
         setToast("Transfer rejected.");
       }
