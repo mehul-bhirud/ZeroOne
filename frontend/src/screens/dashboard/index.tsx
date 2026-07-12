@@ -44,7 +44,11 @@ const kpiCards: KpiConfig[] = [
 ];
 
 // Tone → CSS class mapping (uses Sarthak's status-chip tokens as surface colours)
+<<<<<<< HEAD
 const tonePanel: Record<KpiConfig["tone"], string> = {
+=======
+const tonePanel: Record<string, string> = {
+>>>>>>> 304ad63 (feat(dashboard): add KPI and overdue views)
   positive: "kpi-card--positive",
   info:     "kpi-card--info",
   warning:  "kpi-card--warning",
@@ -228,13 +232,21 @@ export function DashboardScreen() {
         .qa-btn--warning  { background: #493714; color: #FFD47A; border: 1px solid #6B521F; }
 
         /* ── Feature nav ───────────────────────────────────────── */
+<<<<<<< HEAD
         .feature-nav nav {
+=======
+        nav[aria-label="Feature navigation"] {
+>>>>>>> 304ad63 (feat(dashboard): add KPI and overdue views)
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
           margin-bottom: 32px;
         }
+<<<<<<< HEAD
         .feature-nav a {
+=======
+        nav[aria-label="Feature navigation"] a {
+>>>>>>> 304ad63 (feat(dashboard): add KPI and overdue views)
           display: inline-block;
           padding: 7px 16px;
           border-radius: 8px;
@@ -246,7 +258,11 @@ export function DashboardScreen() {
           border: 1px solid #33404D;
           transition: background .15s, color .15s;
         }
+<<<<<<< HEAD
         .feature-nav a:hover { background: #29323B; color: #F3F6F8; }
+=======
+        nav[aria-label="Feature navigation"] a:hover { background: #29323B; color: #F3F6F8; }
+>>>>>>> 304ad63 (feat(dashboard): add KPI and overdue views)
       `}</style>
 
       <ScreenShell
@@ -254,12 +270,20 @@ export function DashboardScreen() {
         description="Monitor custody, reservations, maintenance, returns, and ghost risk."
       >
         {/* Feature nav */}
+<<<<<<< HEAD
         <div className="feature-nav">
           <FeatureNavigation role="employee" />
         </div>
         {/* ── Quick Actions ─────────────────────────────────────── */}
         <section className="quick-actions-section" aria-label="Quick actions">
           <h2 className="quick-actions-title">Quick Actions</h2>
+=======
+        <FeatureNavigation role="admin" />
+
+        {/* ── Quick Actions ─────────────────────────────────────── */}
+        <section className="quick-actions-section" aria-label="Quick actions">
+          <p className="quick-actions-title">Quick Actions</p>
+>>>>>>> 304ad63 (feat(dashboard): add KPI and overdue views)
           <div className="quick-actions-row">
             <button
               id="qa-register-asset"
