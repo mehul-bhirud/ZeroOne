@@ -1,4 +1,4 @@
-import { Link, Navigate, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { LoginScreen, SignupScreen, ForgotPasswordScreen } from "./auth";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { AllocationScreen } from "./screens/allocation";
@@ -26,6 +26,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const location = useLocation();
   if (!user) return <>{children}</>;
 
   const navItems = [
@@ -54,7 +55,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="app-nav">
           {visibleItems.map((item) => {
-            const active = window.location.pathname === item.to;
+            const active = location.pathname === item.to;
             return (
               <Link
                 key={item.to}
