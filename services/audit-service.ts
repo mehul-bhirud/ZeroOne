@@ -197,7 +197,7 @@ export class AuditService implements AuditOperations {
       
       const { rows: admins } = await client.query(`SELECT id FROM users WHERE role IN ('admin', 'asset_manager')`);
       for (const admin of admins) {
-        await NotificationTriggers.auditDiscrepancy(client, admin.id, id as string);
+        await NotificationTriggers.auditDiscrepancy(client, admin.id, id as string, lostAssets.length);
       }
 
       return {

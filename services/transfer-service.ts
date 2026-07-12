@@ -4,6 +4,10 @@ import { BusinessConflictError, ValidationError } from "../domain/errors";
 import { logActivity } from "./activity-log";
 import { NotificationTriggers } from "./notification-service";
 
+function isUserHolder(holderType: unknown): boolean {
+  return holderType === "user" || holderType === "employee";
+}
+
 export class TransferService implements TransferOperations {
   constructor(private db: DatabaseClient) {}
 
@@ -26,10 +30,10 @@ export class TransferService implements TransferOperations {
 
     const { rows: assetRows } = await this.db.query(`SELECT asset_tag FROM assets WHERE id = $1`, [asset_id]);
     
-    if ((from_holder as any)?.holder_type === "employee") {
+    if (isUserHolder((from_holder as any)?.holder_type)) {
       await NotificationTriggers.transfer(this.db, (from_holder as any).holder_id, assetRows[0].asset_tag || (asset_id as string), "requested");
     }
-    if ((to_holder as any)?.holder_type === "employee") {
+    if (isUserHolder((to_holder as any)?.holder_type)) {
       await NotificationTriggers.transfer(this.db, (to_holder as any).holder_id, assetRows[0].asset_tag || (asset_id as string), "requested");
     }
 
@@ -94,10 +98,10 @@ export class TransferService implements TransferOperations {
       await logActivity(client, approved_by as string, 'transfer_approved', 'Asset', transferRequest.asset_id, { transfer_request_id: id });
 
       const { rows: assetRows } = await client.query(`SELECT asset_tag FROM assets WHERE id = $1`, [transferRequest.asset_id]);
-      if (fromHolder?.holder_type === "employee") {
+      if (isUserHolder(fromHolder?.holder_type)) {
         await NotificationTriggers.transfer(client, fromHolder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "approved");
       }
-      if (toHolder?.holder_type === "employee") {
+      if (isUserHolder(toHolder?.holder_type)) {
         await NotificationTriggers.transfer(client, toHolder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "approved");
       }
 
@@ -128,10 +132,10 @@ export class TransferService implements TransferOperations {
 
     const { rows: assetRows } = await this.db.query(`SELECT asset_tag FROM assets WHERE id = $1`, [transferRequest.asset_id]);
     
-    if (transferRequest.from_holder?.holder_type === "employee") {
+    if (isUserHolder(transferRequest.from_holder?.holder_type)) {
       await NotificationTriggers.transfer(this.db, transferRequest.from_holder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "rejected");
     }
-    if (transferRequest.to_holder?.holder_type === "employee") {
+    if (isUserHolder(transferRequest.to_holder?.holder_type)) {
       await NotificationTriggers.transfer(this.db, transferRequest.to_holder.holder_id, assetRows[0].asset_tag || transferRequest.asset_id, "rejected");
     }
 

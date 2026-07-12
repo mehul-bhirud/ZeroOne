@@ -28,8 +28,8 @@ export const NotificationTriggers = {
   overdueReturn: async (db: DatabaseClient, userId: string, assetTag: string) => {
     await triggerNotification(db, userId, "overdue_return", `Return for Asset ${assetTag} is overdue.`);
   },
-  auditDiscrepancy: async (db: DatabaseClient, userId: string, cycleId: string) => {
-    await triggerNotification(db, userId, "audit_discrepancy", `Audit cycle ${cycleId} closed with discrepancies.`);
+  auditDiscrepancy: async (db: DatabaseClient, userId: string, cycleId: string, lostAssetsCount = 0) => {
+    await triggerNotification(db, userId, "audit_discrepancy", `Audit cycle ${cycleId} closed with ${lostAssetsCount} lost assets.`);
   },
   exitClearance: async (db: DatabaseClient, userId: string) => {
     await triggerNotification(db, userId, "exit_clearance", `Exit clearance required.`);

@@ -5,6 +5,10 @@ import { assetStateMachine } from "../domain/workflows";
 import { logActivity } from "./activity-log";
 import { NotificationTriggers } from "./notification-service";
 
+function isUserHolder(holderType: unknown): boolean {
+  return holderType === "user" || holderType === "employee";
+}
+
 export class AllocationService implements AllocationOperations {
   constructor(private db: DatabaseClient) {}
 
@@ -46,7 +50,7 @@ export class AllocationService implements AllocationOperations {
           expected_return_date,
         });
 
-        if (holder_type === "employee") {
+        if (isUserHolder(holder_type)) {
           await NotificationTriggers.allocation(client, holder_id as string, assetRows[0].asset_tag || (asset_id as string), "created");
         }
 
@@ -126,7 +130,7 @@ export class AllocationService implements AllocationOperations {
         return_condition_notes,
       });
 
-      if (allocation.holder_type === "employee") {
+      if (isUserHolder(allocation.holder_type)) {
         await NotificationTriggers.allocation(client, allocation.holder_id, assetRows[0].asset_tag || allocation.asset_id, "returned");
       }
 

@@ -18,6 +18,18 @@ export function mapDomainError(error: Error) {
 
   const pgError = error as any;
   if (pgError.code) {
+    if (pgError.code === "23P01") {
+      return {
+        status: 409,
+        body: { error: { code: "BOOKING_OVERLAP", message: "That time overlaps an existing booking. Choose a different slot.", details: { constraint: pgError.constraint } } },
+      };
+    }
+    if (pgError.code === "AF001") {
+      return {
+        status: 409,
+        body: { error: { code: "EXIT_CLEARANCE_REQUIRED", message: "Employee still has active custody or upcoming bookings. Complete the clearance checklist and retry deactivation.", details: { constraint: pgError.constraint } } },
+      };
+    }
     if (pgError.code === "23505") {
       return {
         status: 409,

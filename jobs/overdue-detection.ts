@@ -2,6 +2,10 @@ import { DatabaseClient } from "../services/db";
 import { logActivity } from "../services/activity-log";
 import { NotificationTriggers } from "../services/notification-service";
 
+function isUserHolder(holderType: unknown): boolean {
+  return holderType === "user" || holderType === "employee";
+}
+
 export interface ScheduledJob {
   name: string;
   run(db: DatabaseClient, now?: Date): Promise<{ processed: number }>;
@@ -22,7 +26,7 @@ export const overdueDetectionJob: ScheduledJob = {
       `, [now.toISOString().split('T')[0]]);
 
       for (const alloc of overdueAllocations) {
-        if (alloc.holder_type === 'employee') {
+        if (isUserHolder(alloc.holder_type)) {
           await NotificationTriggers.overdueReturn(client, alloc.holder_id, alloc.asset_tag || alloc.asset_id);
           await logActivity(client, null, "overdue_detected", "Allocation", alloc.id, {});
           processed++;
