@@ -116,7 +116,7 @@ async function insertFixtures(client: PoolClient, now: Date, password: string): 
   await client.query("INSERT INTO transfer_requests (id, asset_id, from_holder, to_holder, status, requested_by, approved_by) VALUES ($1, $2, $3::jsonb, $4::jsonb, 'pending', $5, NULL), ($6, $7, $8::jsonb, $9::jsonb, 'approved', $10, $11)", ["60000000-0000-0000-0000-000000000001", ids.assets[0], JSON.stringify({ type: "user", id: ids.users[4] }), JSON.stringify({ type: "user", id: ids.users[5] }), ids.users[4], "60000000-0000-0000-0000-000000000002", ids.assets[1], JSON.stringify({ type: "user", id: ids.users[5] }), JSON.stringify({ type: "user", id: ids.users[6] }), ids.users[5], ids.users[1]]);
   const tomorrow = daysFrom(now, 1); tomorrow.setUTCHours(9, 0, 0, 0);
   const bookings = [
-    ["70000000-0000-0000-0000-000000000001", ids.assets[5], ids.users[2], "upcoming", tomorrow, new Date(tomorrow.getTime() + 60 * 60 * 1000)],
+    ["70000000-0000-0000-0000-000000000001", ids.assets[5], ids.users[4], "upcoming", tomorrow, new Date(tomorrow.getTime() + 60 * 60 * 1000)],
     ["70000000-0000-0000-0000-000000000002", ids.assets[5], ids.users[3], "upcoming", new Date(tomorrow.getTime() + 60 * 60 * 1000), new Date(tomorrow.getTime() + 2 * 60 * 60 * 1000)],
     ["70000000-0000-0000-0000-000000000003", ids.assets[6], ids.users[4], "ongoing", hoursFrom(now, -0.5), hoursFrom(now, 0.5)],
     ["70000000-0000-0000-0000-000000000004", ids.assets[16], ids.users[5], "upcoming", daysFrom(now, 2), daysFrom(now, 2.04)],
@@ -168,6 +168,15 @@ export async function assertSeed(client: PoolClient): Promise<Record<string, num
   if (Number(inconsistentMaintenance.rows[0].count) !== 0) throw new Error("Seed verification failed: resolved maintenance cannot leave an asset under maintenance.");
   const approvedTransfer = await client.query<{ count: string }>("SELECT count(*)::text AS count FROM transfer_requests t JOIN allocations a ON a.asset_id = t.asset_id AND a.returned_at IS NULL WHERE t.status = 'approved' AND a.holder_id = (t.to_holder->>'id')::uuid");
   if (Number(approvedTransfer.rows[0].count) < 1) throw new Error("Seed verification failed: approved transfer custody does not match the destination holder.");
+  const clearanceUser = await client.query<{ count: string }>(`
+    SELECT count(*)::text AS count
+    FROM users u
+    WHERE u.id = '20000000-0000-0000-0000-000000000005'
+      AND u.status = 'active'
+      AND EXISTS (SELECT 1 FROM allocations a WHERE a.holder_type = 'user' AND a.holder_id = u.id AND a.returned_at IS NULL)
+      AND EXISTS (SELECT 1 FROM bookings b WHERE b.booked_by = u.id AND b.status = 'upcoming' AND b.end_time > CURRENT_TIMESTAMP)
+  `);
+  if (Number(clearanceUser.rows[0].count) !== 1) throw new Error("Seed verification failed: the canonical exit-clearance employee must have active custody and an upcoming booking.");
   return summary;
 }
 
