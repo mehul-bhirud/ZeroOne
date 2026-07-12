@@ -42,29 +42,38 @@ export class AllocationService implements AllocationOperations {
       // 23505 is PostgreSQL unique_violation. We rely on the partial unique index.
       if (error.code === '23505' && error.constraint === 'one_active_allocation') {
         // Fetch current holder details to enrich the error
-        const { rows } = await this.db.query(`
-          SELECT a.holder_type, a.holder_id, u.name as holder_name 
+        // Fetch current allocation + holder details to enrich the error
+        const { rows: allocRows } = await this.db.query(`
+          SELECT a.*, u.name as holder_name
           FROM allocations a
           LEFT JOIN users u ON a.holder_id = u.id
           WHERE a.asset_id = $1 AND a.returned_at IS NULL
+          ORDER BY a.allocated_at DESC
+          LIMIT 1
         `, [asset_id]);
 
-        const currentHolder = rows[0];
-        const holderName = currentHolder?.holder_name || "Unknown";
+        const currentAllocation = allocRows[0];
+        const holderName = currentAllocation?.holder_name || "Unknown";
 
-        // We fetch the asset tag for the error message
-        const { rows: assetRows } = await this.db.query(`SELECT asset_tag FROM assets WHERE id = $1`, [asset_id]);
-        const assetTag = assetRows[0]?.asset_tag || asset_id;
+        const { rows: assetRows } = await this.db.query(`SELECT * FROM assets WHERE id = $1`, [asset_id]);
+        const asset = assetRows[0];
+        const assetTag = asset?.asset_tag || asset_id;
 
         throw new BusinessConflictError(
-          "ASSET_ALREADY_ALLOCATED", 
+          "ASSET_ALREADY_ALLOCATED",
           `${assetTag} is with ${holderName}. Request a transfer instead.`,
           {
-            asset_id,
-            current_allocation: currentHolder,
-            current_holder: currentHolder,
-            transfer_request_path: "/transfer-requests"
-          }
+            asset,
+            current_allocation: currentAllocation,
+            current_holder: currentAllocation
+              ? {
+                  holder_type: currentAllocation.holder_type,
+                  holder_id: currentAllocation.holder_id,
+                  holder_name: currentAllocation.holder_name,
+                }
+              : null,
+            transfer_request_path: "/transfer-requests",
+          },
         );
       }
       throw error;
