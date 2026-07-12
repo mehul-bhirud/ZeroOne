@@ -40,7 +40,7 @@ export class AssetService implements AssetOperations {
   async create(input: JsonRecord): Promise<JsonRecord> {
     // Basic validation
     const { name, category_id, serial_number, acquisition_date, acquisition_cost, condition, location, is_bookable, photo_url } = input;
-    if (!name || !category_id || !serial_number) {
+    if (!name || !category_id || !serial_number || !acquisition_date || !condition || !location) {
       throw new ValidationError("Missing required fields for Asset creation");
     }
 
