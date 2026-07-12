@@ -4,6 +4,10 @@ AssetFlow is a PostgreSQL-first asset and resource management system. The reposi
 
 This is a development/demo deployment. The seed is intentionally destructive and is restricted to a local database; do not point it at production data.
 
+#### **Admin Panel Details**:
+- **Email**: admin@assetflow.local
+- **Password**: AssetFlow-Demo-2026!
+
 ## Architecture
 
 ```text
